@@ -823,8 +823,10 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
 
   let out = '', err = '';
   const killer = setTimeout(() => { try { proc.kill(); } catch (e) {} }, 120000);
-  proc.stdout.on('data', d => { out += d.toString(); });
-  proc.stderr.on('data', d => { err += d.toString(); });
+  proc.stdout.setEncoding('utf8');
+  proc.stderr.setEncoding('utf8');
+  proc.stdout.on('data', d => { out += d; });
+  proc.stderr.on('data', d => { err += d; });
   proc.on('error', e => { clearTimeout(killer); res.status(500).json({ error: '분석 엔진 실행 실패: ' + e.message }); });
   proc.on('close', code => {
     clearTimeout(killer);
