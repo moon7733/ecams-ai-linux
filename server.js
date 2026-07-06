@@ -819,7 +819,7 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
   const args = ['-p', '--model', MODEL_IDS.sonnet, '--max-turns', '1',
     '--dangerously-skip-permissions',
     '--disallowedTools', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Read', 'Grep', 'Glob'];
-  const proc = spawn('claude', args, { shell: true, windowsHide: true, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const proc = spawn('agy', args, { shell: true, windowsHide: true, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
 
   let out = '', err = '';
   const killer = setTimeout(() => { try { proc.kill(); } catch (e) {} }, 120000);
@@ -835,6 +835,7 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
     }
     res.json({ analysis });
   });
+  proc.stdin.on('error', () => {}); // EPIPE 무시
   proc.stdin.write(prompt, 'utf8');
   proc.stdin.end();
 });
