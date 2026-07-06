@@ -1,0 +1,40 @@
+node_modules/
+
+# AGY 그림자 격리: 원본 미러 복사본 (런타임 생성, 추적 제외)
+.shadow/
+
+# wiki-poc: PoC 입력/출력 데이터는 git 제외 (핵심 문서 4개 plan/checklist/context-notes/system.md 만 추적)
+wiki-poc/context/
+wiki-poc/out/
+wiki-poc/scripts/
+
+# web-push: 서버측 비밀 키 + subscription 영속화 파일 (결정 2, 3)
+.vapid.json
+pushSubscriptions.json
+
+# 자동생성 파일: 기기 간(본사 PC ↔ 노트북) 충돌 방지 — git 추적 제외
+answer_cache.json
+logs/
+
+# UI 리프레시 검증용 스크린샷
+docs/ui-refresh/shots*/
+knowledge/*_entity_index.json
+
+# 리눅스 배포 및 보안을 위한 추가 제외 항목 (토큰, 로컬DB, 임시파일)
+.env
+start.bat
+stop.bat
+*.lnk
+__extracted_*
+packed/
+scratch/
+repo-map-poc/results/
+workspace/
+backup/
+indexes/
+wiki/
+users.json
+repos.json
+requests.json
+companies.json
+*.log

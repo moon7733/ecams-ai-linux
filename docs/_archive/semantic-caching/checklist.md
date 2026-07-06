@@ -1,0 +1,5 @@
+- [x] `knowledgeManager.js`의 `getEmbedding`, `cosineSimilarity` 함수 `module.exports` 노출
+- [x] `server.js`에서 위 함수 임포트
+- [x] `app.post('/api/chat')` 응답 완료 후 캐시 저장 시 `getEmbedding`을 백그라운드로 호출하여 캐시 객체에 `vector`, `reposKey`, `modeTag` 속성 저장 로직 추가
+- [x] `app.post('/api/chat')` 초입에서 Exact Match 실패 시 질문 벡터 조회 및 Cosine Similarity 검사 로직 추가 (> 0.95 시 캐시 Hit 처리)
+- [x] **회귀 버그 수정**: 도입 후 발생한 "질문 입력 시 답변 없이 즉시 종료" 버그를 차단 (context-notes 참조)

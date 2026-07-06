@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Program Files/nodejs/node.exe\" \"/c/Users/ecams/AppData/Roaming/npm/node_modules/pm2/bin/pm2\" restart ecams-bot)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Users\\\\ecams\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\pm2\\\\bin\\\\pm2\" restart ecams-bot)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Users\\\\ecams\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\pm2\\\\bin\\\\pm2\" logs ecams-bot --lines 20 --nostream)",
+      "Bash(gemini --version)",
+      "PowerShell(gemini --version 2>&1)",
+      "PowerShell(npm install -g @google/gemini-cli 2>&1)",
+      "PowerShell(tail -5)",
+      "PowerShell(gemini --help 2>&1)",
+      "PowerShell(if \\(Test-Path \"C:\\\\ecams-ai-multi\\\\.env\"\\) { Get-Content \"C:\\\\ecams-ai-multi\\\\.env\" | Where-Object { $_ -match \"GEMINI\" } })",
+      "PowerShell($env:GEMINI_API_KEY)"
+    ]
+  }
+}

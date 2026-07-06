@@ -1,0 +1,5 @@
+- [x] `public/index.html` 수정: `types` 배열 및 `typeOptions`에 `web_html5`, `web_general` 옵션 추가 (기존 `web` 대체)
+- [x] `server.js` 수정: `loadData()` 시 기존 `type === 'web'`인 레포지토리 탐색하여 폴더명에 따라 `web_html5` 또는 `web_general`로 마이그레이션하는 로직 추가
+- [x] `wikiBuilder.js` 수정: `safeId.endsWith('_html5')` 분기 제거 및 `repoType === 'web_html5'` 적용
+- [x] `wikiBuilder.js`, `graphifyBuilder.js`의 `else { buildWebWiki }` 식 라우팅이 `web_` 계열 접두어를 제대로 타게끔 호환성 확인
+- [x] 단위 검증 수행 (테스트 스크립트 실행)

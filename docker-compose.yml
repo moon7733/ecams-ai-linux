@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ecams-ai:
+    build: .
+    container_name: ecams-ai-linux
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./workspace:/app/workspace
+      - ./backup:/app/backup
+      - ./logs:/app/logs
+      - ./wiki:/app/wiki
+      - ./indexes:/app/indexes
+    environment:
+      - PORT=3000
+      - WORKSPACE_DIR=/app/workspace
+      - BACKUP_DIR=/app/backup
+    restart: unless-stopped

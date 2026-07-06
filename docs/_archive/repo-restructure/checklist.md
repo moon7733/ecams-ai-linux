@@ -1,0 +1,17 @@
+- [ ] 1. **문자열 치환 (UI 및 설정 파일)**
+  - `public/index.html` 내 `moon7733` placeholder 제거
+  - `contextBuilder.js`의 `REPO_WORKSPACE_PATH` 등 하드코딩된 mock 변수 내 `moon7733` 제거
+- [ ] 2. **마이그레이션 스크립트 실행 (데이터 & 물리 폴더)**
+  - `repos.json`, `users.json`의 키에서 `moon7733/` 제거
+  - `workspace/` 하위 `moon7733_` 디렉토리들 원상복구(이름 변경)
+  - `wiki/`, `indexes/` 내부 기존 디렉토리들 고객사 그룹화에 맞게 이동/리네임
+- [ ] 3. **경로 개편 로직 수정 (`server.js`)**
+  - `getIndexPath`에 `companyFolder` 포함
+  - `triggerIndexBuild`에서 `companyFolder` 인자 추가하여 빌더로 넘김
+  - API들 (`/api/wiki/read`, `/api/admin/indexes`)이 개편된 경로를 읽도록 수정
+- [ ] 4. **위키 & 그래프 빌더 수정 (`wikiBuilder.js`, `graphifyBuilder.js`)**
+  - `wikiRoot` 경로 설정 시 `path.join(__dirname, 'wiki', companyFolder, safeId)` 반영
+- [ ] 5. **검색 로직 개편 (`contextBuilder.js`)**
+  - `buildContext`에서 `wikiRoot` 지정 시 `LOCAL_REPOS`의 `companyId`를 참조하여 고객사 폴더명 파악 후 동적 바인딩
+- [ ] 6. **최종 통합 테스트**
+  - 백그라운드 단위 생성, UI 정상 조회 및 AI 응답 테스트

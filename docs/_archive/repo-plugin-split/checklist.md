@@ -1,0 +1,6 @@
+- [x] 클라이언트 플러그인 종류 파악 및 타입 6종 정의 (eclipse, doma, rsa, istudio, vscode, intellij)
+- [x] UI 변경: `public/index.html` 내 `types` 및 `<select>` 옵션 리스트 수정
+- [x] 백엔드 대응 변경: `wikiBuilder.js`, `graphifyBuilder.js`에서 새로운 플러그인 타입 인식을 위해 `repoType.startsWith('plugin_')` 조건 수정
+- [x] 기존 `repos.json` 테스트용 타입 마이그레이션 및 적용 확인
+- [x] 인덱스 및 위키 생성 백그라운드 구동 기능 검증 (`test_script`로 `eCAMS_Plugin` 테스트)
+- [x] 완료 보고
