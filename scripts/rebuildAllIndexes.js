@@ -5,6 +5,7 @@ const path = require('path');
 const { buildIndex } = require('../indexBuilder');
 const { buildWiki } = require('../wikiBuilder');
 const { buildGraphify } = require('../graphifyBuilder');
+const { repoInfoPath } = require('../pathUtils');
 
 const ROOT = path.join(__dirname, '..');
 const INDEXES_DIR = path.join(ROOT, 'indexes');
@@ -32,7 +33,7 @@ async function main() {
   let ok = 0, fail = 0;
   for (const repoId of ids) {
     const info = repos[repoId];
-    const repoPath = typeof info === 'string' ? info : info.path;
+    const repoPath = repoInfoPath(info, ROOT);
     const repoType = (typeof info === 'object' && info.type) || 'server';
     const companyFolder = companyFolderOf(info);
     if (!repoPath || !fs.existsSync(repoPath)) {

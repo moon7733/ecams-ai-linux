@@ -4428,9 +4428,7 @@
       const codeBlocks = [];
       text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
         // 코드 안의 로컬 절대 경로도 보안 마스킹
-        code = code
-          .replace(/[A-Za-z]:[/\\]ecams-ai[/\\](?:workspace|wiki|indexes)[/\\][^/\\\n]+[/\\]/gi, '.../')
-          .replace(/[A-Za-z]:[/\\]ecams-ai[/\\]/gi, '.../');
+        code = maskMachinePaths(code);
         const l = (lang || '').toLowerCase();
         if (l === 'diff' || l === 'patch') {
           // 줄 앞 +/-/@@ 에 따라 색이 입혀지는 diff 블록 (Prism diff-highlight)
@@ -4445,8 +4443,7 @@
       });
 
       // [보안] 로컬 절대 경로 마스킹 (코드 밖 본문)
-      text = text.replace(/[A-Za-z]:[/\\]ecams-ai[/\\](?:workspace|wiki|indexes)[/\\][^/\\\n]+[/\\]/gi, '.../');
-      text = text.replace(/[A-Za-z]:[/\\]ecams-ai[/\\]/gi, '.../');
+      text = maskMachinePaths(text);
 
       // 모델이 마크다운 빈 줄 대신 직접 박은 <br> HTML 태그를 개행으로 정규화.
       // (이스케이프 전에 처리해야 글자 '<br>' 로 노출되지 않고 실제 줄바꿈으로 살아남음)
@@ -4514,6 +4511,13 @@
     function escHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function escJs(str) { return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
+    function maskMachinePaths(str) {
+      return String(str || '')
+        .replace(/[A-Za-z]:[/\\][^ \n\r\t`"'<>]*[/\\](?:workspace|wiki|indexes)[/\\][^/\\\n\r\t`"'<>]+[/\\]/gi, '.../')
+        .replace(/\/[^ \n\r\t`"'<>]*\/(?:workspace|wiki|indexes)\/[^/\\\n\r\t`"'<>]+\//gi, '.../')
+        .replace(/[A-Za-z]:[/\\][^ \n\r\t`"'<>]*[/\\]ecams-ai[/\\]/gi, '.../');
+    }
+
     // diff 표시용: 헤더/prefix 는 유지하되, 본문 줄들의 "공통 최소 들여쓰기"만큼 제거 → 깊게 중첩된 diff 의 우측 치우침 완화 (탭=2칸 환산)
     function dedentDiff(diff) {
       const isHdr = l => /^(---|\+\+\+|@@|diff |index )/.test(l);
@@ -4541,9 +4545,10 @@
       }).join('\n');
     }
 
-    // file:///C:/ecams-ai/{workspace|wiki|indexes}/{회사}/... 링크를 파일명 칩 HTML 로 변환
+    // file:///.../{workspace|wiki|indexes}/... 링크를 파일명 칩 HTML 로 변환
     function buildFileChip(label, url) {
-      let decoded = decodeURIComponent(url.replace(/^file:\/\/\//, ''));
+      let decoded = decodeURIComponent(url.replace(/^file:\/\//, '')).replace(/\\/g, '/');
+      decoded = decoded.replace(/^\/([A-Za-z]:\/)/, '$1');
       // AI 답변이 #L155-L172 처럼 라인범위를 붙이면 경로 끝에서 분리. 안 그러면 ...java#L155-L172 로 파일을 못 찾음.
       let startLine = 0, endLine = 0, lineSuffix = '';
       const frag = decoded.match(/#L(\d+)(?:-L?(\d+))?$/i);
@@ -4555,16 +4560,19 @@
       }
       const fileName = decoded.split('/').pop() || label;   // 확장자 판별·다운로드용 (라인접미사 없는 원본명)
       const displayName = fileName + lineSuffix;             // 칩에 보이는 라벨 (예: CheckOutRequestPage.java:155-172)
-      const m = decoded.match(/^[A-Za-z]:\/ecams-ai\/(workspace|wiki|indexes)\/(.+)$/i);
-      if (!m) return `<span class="file-chip" title="${escHtml(label)}">📄 ${escHtml(displayName)}</span>`;
-      const root = m[1];
-      const segs = m[2].split('/');          // [회사, ...상대경로]
-      const relTitle = segs.join('/');        // 머신 경로(C:/ecams-ai/workspace)는 이미 떼어냄
+      const allSegs = decoded.split('/').filter(Boolean);
+      const rootIdx = allSegs.findIndex(s => ['workspace', 'wiki', 'indexes'].includes(s.toLowerCase()));
+      if (rootIdx < 0 || rootIdx >= allSegs.length - 1) {
+        return `<span class="file-chip" title="${escHtml(label)}">📄 ${escHtml(displayName)}</span>`;
+      }
+      const root = allSegs[rootIdx].toLowerCase();
+      const segs = allSegs.slice(rootIdx + 1); // [회사, ...상대경로] 또는 [repo, ...상대경로]
+      const relTitle = segs.join('/');         // 머신 루트는 이미 떼어냄
       const icon = root === 'wiki' ? '📖' : (root === 'indexes' ? '🗂️' : '📄');
       if (root === 'workspace') {
-        // repo 키 = MY_REPOS 에 존재하는 마지막 세그먼트 (nfcf 처럼 중첩 폴더 대응)
+        // repo 키 = MY_REPOS 에 존재하는 마지막 세그먼트 (회사 폴더 없는 workspace/sample_db 도 대응)
         let repoIdx = -1;
-        for (let i = 1; i < segs.length - 1; i++) if (MY_REPOS[segs[i]]) repoIdx = i;
+        for (let i = 0; i < segs.length - 1; i++) if (MY_REPOS[segs[i]]) repoIdx = i;
         if (repoIdx >= 0) {
           const repoKey = segs[repoIdx];
           const relPath = segs.slice(repoIdx + 1).join('/');
@@ -4579,10 +4587,7 @@
     // diff 블록과 동일하게 절대경로 마스킹을 거친 텍스트를 화면 표시·다운로드·미리보기 모두에 그대로 사용.
     const NEWFILE_LANG_BY_EXT = { java: 'java', js: 'javascript', jsx: 'jsx', ts: 'typescript', tsx: 'tsx', jsp: 'markup', xml: 'markup', html: 'markup', sql: 'sql', py: 'python', json: 'json', css: 'css', c: 'c', pc: 'c', cpp: 'cpp', sh: 'bash', yml: 'yaml', yaml: 'yaml' };
     function buildNewFileBlock(fileName, relPath, code) {
-      const masked = code
-        .replace(/^\n+|\n+$/g, '')
-        .replace(/[A-Za-z]:[/\\]ecams-ai[/\\](?:workspace|wiki|indexes)[/\\][^/\\\n]+[/\\]/gi, '.../')
-        .replace(/[A-Za-z]:[/\\]ecams-ai[/\\]/gi, '.../');
+      const masked = maskMachinePaths(code.replace(/^\n+|\n+$/g, ''));
       const ext = (fileName.match(/\.([^.]+)$/) || [, ''])[1].toLowerCase();
       const prismLang = NEWFILE_LANG_BY_EXT[ext] || '';
       const cls = prismLang ? ` class="language-${prismLang}"` : '';

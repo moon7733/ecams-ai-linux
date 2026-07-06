@@ -23,6 +23,7 @@ const clarifier = require('./clarifier');
 const { getRepoLevel, getUserRepos, getUserRepoMap } = require('./permissions');
 const { createJob, getJob, getJobStatus, setCurrentProcess, appendChunk, finishJob, failJob, cancelJob, subscribe, unsubscribe, countRunningJobs, getSubscriberCount } = require('./jobsManager');
 const pushManager = require('./pushManager');
+const { dataRoot, isPathInside, repoInfoPath, splitKnownDataPath } = require('./pathUtils');
 
 // 로그에 한국 시간 타임스탬프 추가
 const originalLog = console.log;
@@ -202,6 +203,10 @@ function saveUsers() { fs.writeFileSync(path.join(__dirname, 'users.json'), JSON
 function saveRepos() { fs.writeFileSync(path.join(__dirname, 'repos.json'), JSON.stringify(LOCAL_REPOS, null, 2)); }
 function saveRequests() { fs.writeFileSync(path.join(__dirname, 'requests.json'), JSON.stringify(REQUESTS, null, 2)); }
 function saveCompanies() { fs.writeFileSync(path.join(__dirname, 'companies.json'), JSON.stringify(COMPANIES, null, 2)); }
+
+function getRepoBasePath(repoId) {
+  return repoInfoPath(LOCAL_REPOS[repoId], __dirname);
+}
 
 const CHAT_HISTORY_LIMIT = 50;
 const CHAT_HISTORY_DIR = path.join(__dirname, 'logs', 'chat_history');
@@ -672,7 +677,7 @@ app.get('/api/admin/indexes', authMiddleware, (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: '권한이 없습니다.' });
   const result = Object.entries(LOCAL_REPOS).map(([id, info]) => ({
     id,
-    repoPath: typeof info === 'string' ? info : info.path, // 문자열/객체 모두 대응
+    repoPath: getRepoBasePath(id),
     meta: getIndexMeta(id)
   }));
   res.json({ indexes: result });
@@ -684,7 +689,7 @@ app.post('/api/admin/indexes/:repo/build', authMiddleware, async (req, res) => {
   const info = LOCAL_REPOS[repoId];
   if (!info) return res.status(404).json({ error: '레포지토리를 찾을 수 없습니다.' });
 
-  const repoPath = typeof info === 'string' ? info : info.path;
+  const repoPath = getRepoBasePath(repoId);
   res.json({ success: true, message: '인덱스 생성을 시작합니다.' });
   triggerIndexBuild(repoId, repoPath); // 추출된 경로 전달
 });
@@ -732,12 +737,11 @@ app.get('/api/fs/list', authMiddleware, (req, res) => {
   const { repo, dirPath = '' } = req.query;
   if (!getRepoLevel(req.user, repo, LOCAL_REPOS)) return res.status(403).json({ error: '권한이 없습니다.' });
 
-  const repoInfo = LOCAL_REPOS[repo];
-  const basePath = typeof repoInfo === 'string' ? repoInfo : repoInfo?.path;
+  const basePath = getRepoBasePath(repo);
   if (!basePath) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
 
   const targetPath = path.resolve(basePath, dirPath);
-  if (!targetPath.startsWith(path.resolve(basePath))) {
+  if (!isPathInside(basePath, targetPath)) {
     return res.status(400).json({ error: '잘못된 경로입니다.' });
   }
 
@@ -762,12 +766,11 @@ app.get('/api/fs/read', authMiddleware, (req, res) => {
   const { repo, filePath } = req.query;
   if (!getRepoLevel(req.user, repo, LOCAL_REPOS)) return res.status(403).json({ error: '권한이 없습니다.' });
 
-  const repoInfo = LOCAL_REPOS[repo];
-  const basePath = typeof repoInfo === 'string' ? repoInfo : repoInfo?.path;
+  const basePath = getRepoBasePath(repo);
   if (!basePath) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
 
   const targetPath = path.resolve(basePath, filePath);
-  if (!targetPath.startsWith(path.resolve(basePath))) {
+  if (!isPathInside(basePath, targetPath)) {
     return res.status(400).json({ error: '잘못된 경로입니다.' });
   }
 
@@ -854,8 +857,7 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
   if (!getRepoLevel(req.user, repo, LOCAL_REPOS)) return res.status(403).json({ error: '권한이 없습니다.' });
   if (q.length < 2) return res.json({ nameMatches: [], contentMatches: [], truncated: false });
 
-  const repoInfo = LOCAL_REPOS[repo];
-  const basePath = typeof repoInfo === 'string' ? repoInfo : repoInfo?.path;
+  const basePath = getRepoBasePath(repo);
   if (!basePath || !fs.existsSync(basePath)) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
 
   const baseResolved = path.resolve(basePath);
@@ -873,7 +875,7 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { continue; }
     for (const e of entries) {
       const full = path.join(dir, e.name);
-      if (!full.startsWith(baseResolved)) continue; // 경로이탈 안전망
+      if (!isPathInside(baseResolved, full)) continue; // 경로이탈 안전망
       const rel = path.relative(baseResolved, full).replace(/\\/g, '/');
 
       if (e.isDirectory()) {
@@ -912,8 +914,7 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
 function repoRootsFor(repoIds) {
   const set = new Set();
   for (const id of (repoIds || [])) {
-    const info = LOCAL_REPOS[id];
-    const p = typeof info === 'string' ? info : info?.path;
+    const p = getRepoBasePath(id);
     if (p && fs.existsSync(p)) set.add(path.resolve(p));
   }
   return [...set];
@@ -921,11 +922,11 @@ function repoRootsFor(repoIds) {
 // 구버전 ACL 방식(denyWorkspaceWrites)이 남긴 deny ACE 정리 — 시작 시 1회.
 // 현재는 snapshot-restore 로 전환됐으나, 이전 버전이 건 잔재 해제를 위해 유지.
 function resetLeftoverDenies() {
+  if (process.platform !== 'win32') return;
   const user = process.env.USERNAME;
   if (!user) return;
   for (const id in LOCAL_REPOS) {
-    const info = LOCAL_REPOS[id];
-    const p = typeof info === 'string' ? info : info?.path;
+    const p = getRepoBasePath(id);
     if (p && fs.existsSync(p)) {
       try { execFileSync('icacls', [p, '/remove:d', user], { stdio: 'ignore', windowsHide: true }); } catch (e) {}
     }
@@ -1060,11 +1061,10 @@ app.post('/api/fs/apply-diff', authMiddleware, (req, res) => {
     .filter(r => getRepoLevel(req.user, r, LOCAL_REPOS));
   let found = null;
   for (const repo of candidates) {
-    const info = LOCAL_REPOS[repo];
-    const base = typeof info === 'string' ? info : info?.path;
+    const base = getRepoBasePath(repo);
     if (!base) continue;
     const target = path.resolve(base, hunkFile);
-    if (target.startsWith(path.resolve(base)) && fs.existsSync(target) && fs.statSync(target).isFile()) {
+    if (isPathInside(base, target) && fs.existsSync(target) && fs.statSync(target).isFile()) {
       found = { repo, target }; break;
     }
   }
@@ -1097,7 +1097,7 @@ app.get('/api/wiki/read', authMiddleware, (req, res) => {
   const baseWikiPath = path.join(__dirname, 'wiki', companyFolder, safeRepo);
   const targetPath = path.resolve(baseWikiPath, wikiPath || 'Main.md');
 
-  if (!targetPath.startsWith(path.resolve(baseWikiPath))) {
+  if (!isPathInside(baseWikiPath, targetPath)) {
     return res.status(400).json({ error: '잘못된 경로입니다.' });
   }
 
@@ -1522,7 +1522,7 @@ async function buildPrompt(message, allowedRepos, userReposPerms, history, image
   prompt += '# 접근 허가된 레포지토리 목록\n';
   allowedRepos.forEach(r => {
     const repoInfo = LOCAL_REPOS[r];
-    const localPath = typeof repoInfo === 'string' ? repoInfo : repoInfo?.path;
+    const localPath = getRepoBasePath(r);
     const perm = userReposPerms[r];
     if (localPath) {
       prompt += `- [${r}]: ${localPath} (권한: ${perm === 'edit' ? '수정 가능' : '읽기 전용'})\n`;
@@ -1612,12 +1612,11 @@ async function buildPrompt(message, allowedRepos, userReposPerms, history, image
     }
 
     for (const r of allowedRepos) {
-      const repoInfo = LOCAL_REPOS[r];
-      const repoPath = typeof repoInfo === 'string' ? repoInfo : repoInfo?.path;
+      const repoPath = getRepoBasePath(r);
       if (!repoPath) continue;
       const isRelevant = message.includes(r) || r === allowedRepos[0];
       if (!isRelevant) continue;
-      const absRepoPath = path.resolve(repoPath.replace(/\//g, path.sep));
+      const absRepoPath = path.resolve(repoPath);
       const graphResult = await runGraphifyQuery(message, absRepoPath, history);
       if (graphResult && graphResult.length > 100) {
         prompt += `\n# [Graphify: ${r}]\n${graphResult}\n\n`;
@@ -1818,8 +1817,12 @@ const SHADOW_ROOT = path.join(__dirname, '.shadow');
 
 // 실제 경로 → 그림자 경로 (gitRoot 기준 상대구조 유지). 예: workspace/광주은행/x → .shadow/workspace/광주은행/x
 function shadowPathFor(realPath) {
-  const rel = path.relative(__dirname, path.resolve(realPath));
-  return path.join(SHADOW_ROOT, rel);
+  const resolved = path.resolve(realPath);
+  const rel = path.relative(__dirname, resolved);
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return path.join(SHADOW_ROOT, rel);
+  const known = splitKnownDataPath(resolved);
+  if (known) return path.join(SHADOW_ROOT, known.kind, ...known.rest);
+  return path.join(SHADOW_ROOT, path.basename(resolved));
 }
 
 // 그림자 미러에서 제외할 노이즈 디렉토리 — VCS/IDE/빌드/바이너리/웹정적자원. AGY 의 Grep/Glob 탐색 표면을 줄여 수렴 실패·타임아웃 방지.
@@ -1833,10 +1836,58 @@ const SHADOW_XF = ['*.class', '*.o', '*.obj', '*.jar', '*.war', '*.ear', '*.zip'
   '*.ppt', '*.pptx', '*.doc', '*.docx', '*.xls', '*.xlsx', '*.pdf', '*.hwp',
   '*.svn-base', '*.ecm-meta', '*.bak', '*.back', '*_back', '*_bak', '*_real', '*_20??????*'];
 
-// robocopy /MIR 비동기 실행. 종료코드 0~7 은 성공(1=복사,2=extra삭제,3=둘다...), 8 이상만 실제 에러.
+function wildcardToRegExp(pattern) {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`, 'i');
+}
+const SHADOW_XF_RE = SHADOW_XF.map(wildcardToRegExp);
+function isShadowExcludedFile(name) {
+  return SHADOW_XF_RE.some(re => re.test(name));
+}
+
+function mirrorDirectorySync(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  const sourceNames = new Set();
+  let entries;
+  try { entries = fs.readdirSync(src, { withFileTypes: true }); } catch (e) { return; }
+
+  for (const e of entries) {
+    if (e.isDirectory() && SHADOW_XD.includes(e.name)) continue;
+    if (e.isFile() && isShadowExcludedFile(e.name)) continue;
+    sourceNames.add(e.name);
+    const s = path.join(src, e.name);
+    const d = path.join(dst, e.name);
+    if (e.isDirectory()) {
+      mirrorDirectorySync(s, d);
+    } else if (e.isFile()) {
+      fs.copyFileSync(s, d);
+    }
+  }
+
+  let dstEntries;
+  try { dstEntries = fs.readdirSync(dst, { withFileTypes: true }); } catch (e) { return; }
+  for (const e of dstEntries) {
+    if (!sourceNames.has(e.name)) {
+      fs.rmSync(path.join(dst, e.name), { recursive: true, force: true });
+    }
+  }
+}
+
+// Windows는 robocopy /MIR, 그 외 OS는 Node 기반 미러. 둘 다 shadow 하위만 갱신한다.
 function robomirror(src, dst) {
   return new Promise((resolve, reject) => {
     try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
+    if (process.platform !== 'win32') {
+      try {
+        mirrorDirectorySync(src, dst);
+        return resolve();
+      } catch (e) {
+        console.error(`[Shadow] mirror 실패: ${src} → ${dst}`, e.message);
+        return reject(e);
+      }
+    }
     execFile('robocopy', [src, dst, '/MIR', '/MT:16', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1',
       '/XD', ...SHADOW_XD, '/XF', ...SHADOW_XF],
       { windowsHide: true }, (err) => {
@@ -1867,8 +1918,11 @@ function neutralizeShadowPaths(shadowDir) {
       if (!e.name.endsWith('.md')) continue;
       let content;
       try { content = fs.readFileSync(full, 'utf8'); } catch (e) { continue; }
-      if (!content.includes('ecams-ai/workspace') && !content.includes('ecams-ai\\workspace')) continue;
-      const fixed = content.replace(/[Cc]:\/ecams-ai\/workspace/g, fwdTo).replace(/[Cc]:\\ecams-ai\\workspace/g, backTo);
+      if (!content.includes('/workspace') && !content.includes('\\workspace')) continue;
+      const fixed = content
+        .replace(/[A-Za-z]:\/[^ \n\r\t`"'<>]*\/workspace/g, fwdTo)
+        .replace(/[A-Za-z]:\\[^ \n\r\t`"'<>]*\\workspace/g, backTo)
+        .replace(/\/[^ \n\r\t`"'<>]*\/workspace/g, fwdTo);
       try { fs.writeFileSync(full, fixed, 'utf8'); } catch (e) {}
     }
   }
@@ -1906,18 +1960,18 @@ async function prepareShadows(allowedRepos) {
   try { fs.mkdirSync(wsShadowRoot, { recursive: true }); } catch (e) {}
   const includeDirs = [];
   const banks = new Set();
+  const workspaceRoot = dataRoot('workspace', __dirname);
   for (const r of allowedRepos) {
-    const info = LOCAL_REPOS[r];
-    const p = typeof info === 'string' ? info : info?.path;
+    const p = getRepoBasePath(r);
     if (!p) continue;
-    const real = path.resolve(p.replace(/\//g, path.sep));
+    const real = path.resolve(p);
     if (!fs.existsSync(real)) continue;
     const shadow = shadowPathFor(real);
     await robomirror(real, shadow);
     decodeJavaEscapesInShadow(shadow); // .java 의 \uXXXX 한글 이스케이프 → 실제 한글 (그림자 한정, 검색성↑)
     includeDirs.push(shadow);
     // 은행명 = workspace 바로 아래 첫 세그먼트 (wiki/indexes 가 은행명으로 분류됨)
-    const rel = path.relative(path.join(__dirname, 'workspace'), real);
+    const rel = path.relative(workspaceRoot, real);
     const bank = rel.split(path.sep)[0];
     if (bank && !bank.startsWith('..')) banks.add(bank);
   }
@@ -2211,7 +2265,7 @@ app.get('/api/admin/repos/all', authMiddleware, (req, res) => {
     const info = LOCAL_REPOS[id];
     return {
       id,
-      path: typeof info === 'string' ? info : info.path,
+      path: getRepoBasePath(id),
       companyId: info.companyId || 'none',
       type: info.type || 'server'
     };

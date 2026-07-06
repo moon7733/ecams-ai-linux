@@ -15,8 +15,10 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { resolvePortablePath } = require('../pathUtils');
 
-const REPO_PATH = process.argv[2] || 'c:/ecams-ai/workspace/광주은행/kjbank_html5';
+const ROOT = path.join(__dirname, '..');
+const REPO_PATH = resolvePortablePath(process.argv[2] || path.join(ROOT, 'workspace', '광주은행', 'kjbank_html5'), ROOT);
 const FLAG_JSON = process.argv.includes('--json');
 const FLAG_REPOIGNORE = process.argv.includes('--repoignore');
 

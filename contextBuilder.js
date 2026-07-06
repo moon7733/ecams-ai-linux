@@ -6,6 +6,7 @@ const wikiV2Loader = require('./wikiV2Loader');
 const repoMapBuilder = require('./repoMapBuilder');
 const entityIndex = require('./entityIndexBuilder');
 const { smartRead } = require('./encoding');
+const { repoInfoPath } = require('./pathUtils');
 
 let companies = [];
 try { companies = JSON.parse(fs.readFileSync(path.join(__dirname, 'companies.json'), 'utf8')); } catch (e) {}
@@ -17,13 +18,6 @@ function getCompanyFolder(companyId) {
 
 // Feature flag — env USE_REPO_MAP=true 시 repo-map 패턴 사용
 const USE_REPO_MAP = process.env.USE_REPO_MAP === 'true';
-
-// kjbank repo 별 workspace 경로 매핑 (repo-map 빌드 대상) — 키는 repos.json 형식 (슬래시)
-const REPO_WORKSPACE_PATH = {
-  'kjbank_html5': 'c:/ecams-ai/workspace/광주은행/kjbank_html5',
-  'kjbank_server': 'c:/ecams-ai/workspace/광주은행/kjbank_server',
-  'kjbank_db': 'c:/ecams-ai/workspace/sample_db',
-};
 
 // repo-map 캐시 (mtime 기반 invalidation 은 단순화 — 10분 TTL)
 const REPO_MAP_CACHE = new Map();
@@ -283,7 +277,7 @@ async function buildContextWithRepoMap(message, allowedRepos, LOCAL_REPOS) {
   console.log(`[RepoMap] 진입 — allowedRepos=[${allowedRepos.join(', ')}]`);
 
   for (const repoId of allowedRepos) {
-    const workspacePath = REPO_WORKSPACE_PATH[repoId];
+    const workspacePath = repoInfoPath(LOCAL_REPOS[repoId], __dirname);
     if (!workspacePath || !fs.existsSync(workspacePath)) {
       console.log(`[RepoMap] skip ${repoId} — workspace 미매핑 또는 없음 (path=${workspacePath})`);
       continue;
