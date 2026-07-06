@@ -1,0 +1,127 @@
+{
+  "kjbank_html5": {
+    "path": "C:/ecams-ai/workspace/광주은행/kjbank_html5",
+    "companyId": "comp_1778478960457",
+    "type": "web_html5"
+  },
+  "kjbank_server": {
+    "path": "C:/ecams-ai/workspace/광주은행/kjbank_server",
+    "companyId": "comp_1778478960457",
+    "type": "server"
+  },
+  "toss_html5": {
+    "path": "C:/ecams-ai/workspace/토스/toss_html5",
+    "companyId": "comp_1778545238108",
+    "type": "web_html5"
+  },
+  "toss_server": {
+    "path": "C:/ecams-ai/workspace/토스/toss_server",
+    "companyId": "comp_1778545238108",
+    "type": "server"
+  },
+  "hana_html5": {
+    "path": "C:/ecams-ai/workspace/하나은행/hana_html5",
+    "companyId": "comp_1778545085192",
+    "type": "web_html5"
+  },
+  "hana_server": {
+    "path": "C:/ecams-ai/workspace/하나은행/hana_server",
+    "companyId": "comp_1778545085192",
+    "type": "server"
+  },
+  "hana_db": {
+    "path": "C:/ecams-ai/workspace/하나은행/hana_db",
+    "companyId": "comp_1778545085192",
+    "type": "db"
+  },
+  "hnbank_cn_html": {
+    "path": "C:/ecams-ai/workspace/하나은행중국법인/hnbank_cn_html",
+    "companyId": "comp_1778545227412",
+    "type": "web_general"
+  },
+  "gongje_html": {
+    "path": "C:/ecams-ai/workspace/수협공제/gongje_html",
+    "companyId": "comp_1778545249350",
+    "type": "web_general"
+  },
+  "eCAMS_Plugin": {
+    "path": "C:/ecams-ai/workspace/신한EZ/eCAMS_Plugin",
+    "companyId": "comp_1778657693860",
+    "type": "plugin_eclipse"
+  },
+  "eCAMS_Server": {
+    "path": "C:/ecams-ai/workspace/고객사없음/eCAMS_Server",
+    "companyId": "none",
+    "type": "plugin_server"
+  },
+  "nhcard_html": {
+    "path": "C:/ecams-ai/workspace/농협카드콜센터/nhcard_html",
+    "companyId": "comp_1778545267285",
+    "type": "web_general"
+  },
+  "sample_db": {
+    "path": "C:/ecams-ai/workspace/sample_db",
+    "companyId": "none",
+    "type": "db"
+  },
+  "nfcf_html5": {
+    "path": "C:/ecams-ai/workspace/산림조합/nfcf_html5/nfcf_html5",
+    "companyId": "comp_1778656284202",
+    "type": "web_html5"
+  },
+  "nfcf_server": {
+    "path": "C:/ecams-ai/workspace/산림조합/nfcf_server/nfcf_server",
+    "companyId": "comp_1778656284202",
+    "type": "server"
+  },
+  "shez_html": {
+    "path": "C:/ecams-ai/workspace/신한EZ/shez_html",
+    "companyId": "comp_1778657693860",
+    "type": "web_general"
+  },
+  "shez_server": {
+    "path": "C:/ecams-ai/workspace/신한EZ/shez_server",
+    "companyId": "comp_1778657693860",
+    "type": "server"
+  },
+  "eCAMS_SERVER": {
+    "path": "C:/ecams-ai/workspace/신한EZ/eCAMS_SERVER",
+    "companyId": "comp_1778657693860",
+    "type": "plugin_server"
+  },
+  "shez_db": {
+    "path": "C:/ecams-ai/workspace/신한EZ/shez_db",
+    "companyId": "comp_1778657693860",
+    "type": "db"
+  },
+  "Eclipse_Plugin": {
+    "path": "C:/ecams-ai/workspace/광주은행/Eclipse_Plugin",
+    "companyId": "comp_1778478960457",
+    "type": "plugin_eclipse"
+  },
+  "DOMA_Plugin": {
+    "path": "C:/ecams-ai/workspace/광주은행/DOMA_Plugin",
+    "companyId": "comp_1778478960457",
+    "type": "plugin_doma"
+  },
+  "RSA_Plugin": {
+    "path": "C:/ecams-ai/workspace/광주은행/RSA_Plugin",
+    "companyId": "comp_1778478960457",
+    "type": "plugin_rsa"
+  },
+  "eCAMS_Server.new": {
+    "path": "C:/ecams-ai/workspace/광주은행/eCAMS_Server_new",
+    "companyId": "comp_1778478960457",
+    "type": "plugin_server"
+  },
+  "suhyup_plugin_src": {
+    "path": "C:/ecams-ai/workspace/수협은행/suhyup_plugin_src",
+    "companyId": "comp_1781676335423",
+    "type": "plugin_eclipse"
+  },
+  "suhyup_plugin_server": {
+    "path": "C:/ecams-ai/workspace/수협은행/suhyup_plugin_server",
+    "companyId": "comp_1781676335423",
+    "type": "plugin_server"
+  }
+}

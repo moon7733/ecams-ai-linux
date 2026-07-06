@@ -1,0 +1,148 @@
+[
+  {
+    "id": "req_1778225187115",
+    "type": "signup",
+    "userId": "ymlee",
+    "password": "ecams123",
+    "status": "approved",
+    "timestamp": 1778225187115
+  },
+  {
+    "id": "req_1778225230958",
+    "type": "repo_auth",
+    "userId": "ymlee",
+    "repo": "kjbank_html5",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778225230958
+  },
+  {
+    "id": "req_1778230881245",
+    "type": "repo_auth",
+    "userId": "admin",
+    "repo": "nhcard_html",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778230881245
+  },
+  {
+    "id": "req_1778471651777",
+    "type": "repo_auth",
+    "userId": "ymlee",
+    "repo": "ecamsap",
+    "level": "read",
+    "status": "approved",
+    "timestamp": 1778471651777
+  },
+  {
+    "id": "req_1778541028561",
+    "type": "signup",
+    "userId": "polaris",
+    "password": "$2b$10$p1FOg6YoD/P2D6VWLF4Cmuk.TXHYphpYnvMyFgoJceGjOhy7dYBpy",
+    "name": "강창석",
+    "phone": "010-5556-3468",
+    "affiliation": "(주)아즈소프트",
+    "userType": "azsoft",
+    "status": "approved",
+    "timestamp": 1778541028561
+  },
+  {
+    "id": "req_1778657019540",
+    "type": "signup",
+    "userId": "mhyu",
+    "password": "$2b$10$dyupH5CYy7pwj0LxPsIiHu6ZKvvPty/dLdiHXH7U3mCxB3BiBhxBW",
+    "name": "유명환",
+    "phone": "010-8722-8429",
+    "affiliation": "(주)아즈소프트",
+    "userType": "azsoft",
+    "status": "approved",
+    "timestamp": 1778657019540
+  },
+  {
+    "id": "req_1778657077075",
+    "type": "repo_auth",
+    "userId": "mhyu",
+    "repo": "nfcf_html5",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778657077075
+  },
+  {
+    "id": "req_1778657082713",
+    "type": "repo_auth",
+    "userId": "mhyu",
+    "repo": "nfcf_server",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778657082713
+  },
+  {
+    "id": "req_1778657212541",
+    "type": "signup",
+    "userId": "david914",
+    "password": "$2b$10$0byHjUhtYF65k3x69xQJfewa5wH5BHkDntAsmsLanxKBRp3ivlPjW",
+    "name": "이성현",
+    "phone": "010-3129-3289",
+    "affiliation": "(주)아즈소프트",
+    "userType": "azsoft",
+    "status": "approved",
+    "timestamp": 1778657212541
+  },
+  {
+    "id": "req_1778658574139",
+    "type": "repo_auth",
+    "userId": "david914",
+    "repo": "shez_html",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778658574139
+  },
+  {
+    "id": "req_1778658584409",
+    "type": "repo_auth",
+    "userId": "david914",
+    "repo": "shez_server",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778658584409
+  },
+  {
+    "id": "req_1778658599330",
+    "type": "repo_auth",
+    "userId": "david914",
+    "repo": "eCAMS_SERVER",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778658599330
+  },
+  {
+    "id": "req_1778658605690",
+    "type": "repo_auth",
+    "userId": "david914",
+    "repo": "eCAMS_Plugin",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778658605690
+  },
+  {
+    "id": "req_1778658611074",
+    "type": "repo_auth",
+    "userId": "david914",
+    "repo": "shez_db",
+    "level": "edit",
+    "status": "approved",
+    "timestamp": 1778658611074
+  },
+  {
+    "id": "req_1782715786806",
+    "type": "signup",
+    "userId": "djsun",
+    "password": "$2b$10$mKCs9wTuqJ/KoJdsLx30cOUl8cfGvsTqWZGG/TnuDghgvgb23GW0e",
+    "name": "선동준",
+    "phone": "010-1234-5678",
+    "affiliation": "광주은행",
+    "userType": "customer",
+    "status": "approved",
+    "timestamp": 1782715786806
+  }
+]

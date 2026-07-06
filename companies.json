@@ -1,0 +1,56 @@
+[
+  {
+    "id": "comp_1778478960457",
+    "name": "광주은행",
+    "address": "광주",
+    "manager": "선동준"
+  },
+  {
+    "id": "comp_1778545085192",
+    "name": "하나은행",
+    "address": "",
+    "manager": "이정노"
+  },
+  {
+    "id": "comp_1778545227412",
+    "name": "하나은행중국법인",
+    "address": "",
+    "manager": "황내규"
+  },
+  {
+    "id": "comp_1778545238108",
+    "name": "토스",
+    "address": "",
+    "manager": "김태원"
+  },
+  {
+    "id": "comp_1778545249350",
+    "name": "수협공제",
+    "address": "",
+    "manager": "김성민"
+  },
+  {
+    "id": "comp_1778545267285",
+    "name": "농협카드콜센터",
+    "address": "",
+    "manager": "미정"
+  },
+  {
+    "id": "comp_1778656284202",
+    "name": "산림조합",
+    "address": "",
+    "manager": "박준서"
+  },
+  {
+    "id": "comp_1778657693860",
+    "name": "신한EZ",
+    "address": "",
+    "manager": "허종건"
+  },
+  {
+    "id": "comp_1781676335423",
+    "name": "수협은행",
+    "address": "잠실",
+    "manager": "김현명"
+  }
+]

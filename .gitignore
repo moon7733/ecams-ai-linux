@@ -31,10 +31,4 @@ scratch/
 repo-map-poc/results/
 workspace/
 backup/
-indexes/
-wiki/
-users.json
-repos.json
-requests.json
-companies.json
 *.log
