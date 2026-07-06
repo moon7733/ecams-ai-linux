@@ -15,7 +15,7 @@ pipeline {
   environment {
     DEPLOY_HOST = '192.168.0.11'
     DEPLOY_USER = 'pms'
-    DEPLOY_DIR = '/SW2/ecams-ai-linux'
+    DEPLOY_DIR = '/SW2/azbrain'
     DEPLOY_PORT = '3000'
     DEPLOY_CREDENTIALS_ID = 'pms-deploy-ssh-key'
   }
