@@ -3,8 +3,8 @@ pipeline {
   agent any
 
   triggers {
-    // GitHub에서 내부망 Jenkins로 webhook이 못 들어오므로 2분마다 SCM 변경을 확인한다.
-    pollSCM('H/2 * * * *')
+    // Tailscale Funnel을 통해 GitHub Webhook을 수신합니다.
+    githubPush()
   }
 
   options {
