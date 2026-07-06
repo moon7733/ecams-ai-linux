@@ -22,12 +22,6 @@ pipeline {
 
   stages {
     stage('Deploy') {
-      when {
-        allOf {
-          branch 'main'
-          expression { return env.DEPLOY_ENABLED == null || env.DEPLOY_ENABLED == 'true' }
-        }
-      }
       steps {
         withCredentials([sshUserPrivateKey(credentialsId: env.DEPLOY_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
           sh '''
