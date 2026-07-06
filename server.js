@@ -1939,7 +1939,9 @@ async function prepareShadows(allowedRepos) {
 }
 
 // agy CLI 통합 — 결정 11 (2026-06-01): node-pty 로 ConPTY wrapping. raw spawn 은 stdout TTY 미감지 시 응답 직전 셧다운 (silent fail). docs/agy-integration/context-notes.md 참고.
-const AGY_EXE = path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe');
+const AGY_EXE = process.platform === 'win32'
+  ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
+  : (process.env.AGY_EXE_PATH || '/usr/local/bin/agy');
 const CODEX_EXE = process.env.CODEX_EXE || path.join(os.homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'd8dfab353c0001dc', 'codex.exe');
 
 // AGY 비결정성: 분석을 끝내지 않고 짧은 영문 placeholder("I am waiting for the ... search to complete...")만 내고 종료하는 bail 감지.
@@ -2120,9 +2122,9 @@ async function runAgyWithRetry(prompt, res, allowedRepos, overallStartTime, req,
     }
     const { answer, code, bailType, durationMs } = await runAgyStream(currentPrompt, res, allowedRepos, overallStartTime, req);
 
-    // 버킷 A: 인프라 실패(엔진 미기동, spawn/write 실패 → code=-1). "질문 좁혀달라"는 오해 유발 → 별도 문구, 재시도 안 함.
-    if (code === -1) {
-      const errMsg = '⚠️ 분석 엔진을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    // 버킷 A: 인프라 실패(엔진 미기동, 리눅스 명령어 없음(127), spawn/write 실패 → code=-1). "질문 좁혀달라"는 오해 유발 → 별도 문구, 재시도 안 함.
+    if (code === -1 || code === 127) {
+      const errMsg = '⚠️ 분석 엔진(AGY)을 시작하지 못했거나 실행 파일을 찾을 수 없습니다. 설정 또는 경로를 확인해 주세요.';
       res.write('data: ' + JSON.stringify({ type: 'text', text: errMsg }) + '\n\n');
       return errMsg;
     }

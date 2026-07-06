@@ -12,6 +12,8 @@ services:
       - ./logs:/app/logs
       - ./wiki:/app/wiki
       - ./indexes:/app/indexes
+      # AGY 계정 인증 정보(월정액 세션)가 저장된 로컬 설정 폴더를 컨테이너 내부로 연동
+      - ~/.gemini:/root/.gemini
     environment:
       - PORT=3000
       - WORKSPACE_DIR=/app/workspace
