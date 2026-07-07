@@ -27,6 +27,8 @@ echo "[deploy] waiting for app health..."
 for i in $(seq 1 30); do
   if curl -fsS "http://localhost:${PORT}/api/companies" >/dev/null 2>&1; then
     echo "[deploy] healthcheck OK (attempt ${i})"
+    echo "[deploy] prune dangling docker images..."
+    docker image prune -f
     exit 0
   fi
   sleep 2
