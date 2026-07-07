@@ -6,6 +6,26 @@ const { Pool } = require('pg');
 const ROOT = path.join(__dirname, '..');
 const dryRun = process.argv.includes('--dry-run');
 
+function loadEnvFile() {
+  const envPath = path.join(ROOT, '.env');
+  if (!fs.existsSync(envPath)) return;
+
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eq = trimmed.indexOf('=');
+    if (eq < 1) continue;
+
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (!process.env[key]) process.env[key] = value;
+  }
+}
+
 function readJson(name, fallback) {
   const file = path.join(ROOT, name);
   if (!fs.existsSync(file)) return fallback;
@@ -225,6 +245,8 @@ async function migrate(rows) {
 }
 
 async function main() {
+  loadEnvFile();
+
   const rows = buildRows();
   console.log('[migrateCoreJson] users:', rows.users.length);
   console.log('[migrateCoreJson] companies:', rows.companies.length);
@@ -243,6 +265,7 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('[migrateCoreJson] 실패:', err.message);
+  const message = err?.stack || err?.message || String(err);
+  console.error('[migrateCoreJson] 실패:', message);
   process.exit(1);
 });
