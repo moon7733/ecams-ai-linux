@@ -176,7 +176,9 @@ flowchart LR
 
 스택 전환 결정과 무관하게 즉시 가치가 있다. 현재 대화는 서버 API가 있지만 최종 저장소가 `logs/chat_history/*.json` 파일이므로 검색과 지식화에 한계가 있다.
 
-- PostgreSQL 설치, chat_sessions / chat_messages 테이블 생성.
+- 외부 PostgreSQL 서버는 `192.168.0.21`을 사용한다.
+- Node 컨테이너는 `PGHOST=192.168.0.21` 기준으로 접속한다.
+- `chat_sessions`, `chat_messages` 테이블은 앱 연결 시 SQL로 보장한다.
 - 기존 Node 서버의 `/api/chat/history` 계약은 유지하고 저장소만 PostgreSQL 우선으로 변경.
 - DB 연결이 실패하면 기존 파일 저장소로 fallback.
 - 기존 `logs/chat_history/*.json` 데이터를 PostgreSQL로 이전.
@@ -237,8 +239,8 @@ flowchart LR
 
 ## Deployment 전환
 
-현재 docker-compose.yml에는 Node 앱 하나만 있다. 단계별로 서비스를 추가한다.
+현재 docker-compose.yml에는 Node 앱 하나만 두고, PostgreSQL은 192.168.0.21 외부 서버를 사용한다.
 
-- 1단계. 기존 Node 컨테이너 + PostgreSQL 컨테이너 추가.
+- 1단계. 기존 Node 컨테이너가 192.168.0.21 PostgreSQL에 접속.
 - 2단계. Spring Boot 컨테이너 추가. Node는 내부 서비스로 전환하되 스트리밍 경로는 nginx 또는 Spring 프록시로 숨긴다.
-- 최종. nginx(Vue 빌드), Spring Boot, PostgreSQL, Node worker — 4개 서비스 구성.
+- 최종. nginx(Vue 빌드), Spring Boot, Node worker, 외부 PostgreSQL 구성.

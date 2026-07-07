@@ -42,3 +42,10 @@
 - Google OAuth 확정 사항을 인증 전환 계획에 반영했다. 사내 사용자는 `@azsoft.kr` Google OAuth, 고객사 사용자는 기존 계정 또는 별도 초대 방식을 검토한다.
 - 1단계 구현으로 `chatHistoryDb.js`, `db/init/001_chat_history.sql`, `scripts/migrateChatHistoryToPostgres.js`를 추가했다.
 - `docker compose up -d postgres`로 PostgreSQL 컨테이너를 띄워 `chat_sessions`, `chat_messages` 쓰기/읽기 smoke 검증을 완료했다. 검증 후 테스트 행은 삭제하고 컨테이너는 stop 상태로 돌렸다.
+
+## 2026-07-07 (오후 — PostgreSQL 서버 정정)
+
+- 사용자가 지정한 실제 PostgreSQL 대상은 Docker 내부 DB가 아니라 192.168.0.21 서버다.
+- 로컬 Docker Postgres는 smoke 검증용으로만 사용한 것으로 정정했다.
+- docker-compose에서 로컬 postgres 서비스를 제거하고, `ecams-ai` 컨테이너가 `PGHOST=192.168.0.21` 외부 DB에 접속하도록 수정했다.
+- 외부 DB는 docker-entrypoint init SQL이 실행되지 않으므로, 앱 연결 시 `db/init/001_chat_history.sql`을 실행해 chat history 스키마를 보장하도록 했다.

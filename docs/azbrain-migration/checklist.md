@@ -13,8 +13,9 @@
 
 ## 1단계: 대화 히스토리 PostgreSQL 이전
 
-- [x] PostgreSQL 설치 및 docker-compose에 추가.
+- [x] PostgreSQL 대상 서버를 192.168.0.21 외부 DB로 정정.
 - [x] chat_sessions / chat_messages 테이블 설계.
+- [x] 앱 연결 시 chat history 스키마 자동 보장.
 - [x] 기존 Node 대화 저장/조회 API를 PostgreSQL 우선 저장소로 연결.
 - [x] DB 연결 실패 시 기존 파일 저장소 fallback 유지.
 - [x] logs/chat_history/*.json → PostgreSQL 이전 스크립트 추가.

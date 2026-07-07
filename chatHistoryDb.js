@@ -1,4 +1,6 @@
 // 대화 히스토리를 PostgreSQL에 저장하는 어댑터
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 
 const CHAT_HISTORY_LIMIT = 50;
@@ -6,6 +8,7 @@ const hasDatabaseConfig = !!(process.env.DATABASE_URL || process.env.PGHOST || p
 
 let pool = null;
 let readyPromise = null;
+let schemaPromise = null;
 let disabled = !hasDatabaseConfig;
 let warned = false;
 
@@ -35,13 +38,26 @@ async function ensureReady() {
   const db = getPool();
   if (!db) return false;
   if (!readyPromise) {
-    readyPromise = db.query('select 1').then(() => true).catch(err => {
+    readyPromise = db.query('select 1').then(async () => {
+      await ensureSchema();
+      return true;
+    }).catch(err => {
       disabled = true;
       warnOnce('PostgreSQL 연결 실패. 파일 저장소로 폴백합니다.', err);
       return false;
     });
   }
   return readyPromise;
+}
+
+async function ensureSchema() {
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = (async () => {
+    const schemaPath = path.join(__dirname, 'db', 'init', '001_chat_history.sql');
+    const sql = fs.readFileSync(schemaPath, 'utf8');
+    await pool.query(sql);
+  })();
+  return schemaPromise;
 }
 
 async function readChatHistory(userId) {
