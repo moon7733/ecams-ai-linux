@@ -66,3 +66,9 @@
 - 첫 API 범위는 기존 화면 영향이 작은 `/api/login`, `/api/companies`, `/api/repos/all`, `/api/repos`로 제한했다.
 - JWT는 외부 JWT 라이브러리 없이 HMAC-SHA256 표준 구현으로 발급·검증한다. 기존 bcrypt hash는 Spring Security `BCryptPasswordEncoder`로 검증한다.
 - docker-compose에 `azbrain-api` 서비스를 추가했지만 Node `ecams-ai` 서비스는 그대로 유지한다. 호스트 기본 포트는 8080 충돌을 피하려고 8081로 둔다.
+
+## 2026-07-07 (Vue 3 뼈대)
+
+- Vue 3 프로젝트는 `frontend/` 독립 Vite 모듈로 둔다. 기존 `public/index.html`은 아직 운영 화면으로 유지한다.
+- 첫 화면은 마케팅 페이지가 아니라 Spring Boot API 연결 확인 화면으로 만들었다. 브라우저에서 고객사 조회, 로그인, 저장소 권한 조회를 바로 확인할 수 있다.
+- docker-compose에는 `azbrain-web` 서비스를 추가하고 기본 호스트 포트는 8082로 둔다. nginx가 `/api`를 `azbrain-api:8080`으로 프록시한다.

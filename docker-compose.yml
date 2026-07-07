@@ -1,5 +1,14 @@
 
 services:
+  azbrain-web:
+    build: ./frontend
+    container_name: azbrain-web
+    ports:
+      - "${AZBRAIN_WEB_PORT:-8082}:80"
+    depends_on:
+      - azbrain-api
+    restart: unless-stopped
+
   azbrain-api:
     build: ./backend
     container_name: azbrain-api

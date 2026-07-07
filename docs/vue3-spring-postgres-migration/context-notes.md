@@ -22,3 +22,9 @@
 - Spring Boot 전환 구조는 `backend/` 독립 Maven 모듈로 확정했다. 기존 Node 앱은 당분간 그대로 실행하고, Spring API는 8080 포트의 새 서비스로 병행 검증한다.
 - 첫 컨트롤러는 기존 UI 계약과 맞추기 위해 `/api/login`, `/api/companies`, `/api/repos/all`, `/api/repos`만 구현한다.
 - JPA 엔티티보다 `JdbcTemplate`을 먼저 사용한다. 기존 JSON에서 이전한 테이블 형태가 단순하고, 응답 계약 보존이 우선이기 때문이다.
+
+## 2026-07-07
+
+- Vue 3 전환 구조는 `frontend/` 독립 Vite 모듈로 확정했다.
+- 첫 화면은 신규 API smoke를 사람이 브라우저에서 확인하는 용도다. 기존 대형 HTML 화면을 바로 분해하지 않고, DB 기반 Spring API 연결 검증을 먼저 안정화한다.
+- 프로덕션 컨테이너는 nginx로 정적 파일을 제공하고 `/api` 요청만 Spring Boot 서비스로 프록시한다.

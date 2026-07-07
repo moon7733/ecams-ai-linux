@@ -1,4 +1,7 @@
 node_modules/
+backend/target/
+frontend/node_modules/
+frontend/dist/
 
 # AGY 그림자 격리: 원본 미러 복사본 (런타임 생성, 추적 제외)
 .shadow/
