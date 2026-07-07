@@ -1,8 +1,30 @@
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecams-ai-postgres
+    ports:
+      - "${ECAMS_DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-azbrain}
+      - POSTGRES_USER=${POSTGRES_USER:-azbrain}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-azbrain_dev_password}
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   ecams-ai:
     build: .
     container_name: ecams-ai-linux
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${ECAMS_HTTP_PORT:-3000}:3000"
     volumes:
@@ -17,4 +39,5 @@ services:
       - PORT=3000
       - WORKSPACE_DIR=/app/workspace
       - BACKUP_DIR=/app/backup
+      - DATABASE_URL=postgres://${POSTGRES_USER:-azbrain}:${POSTGRES_PASSWORD:-azbrain_dev_password}@postgres:5432/${POSTGRES_DB:-azbrain}
     restart: unless-stopped

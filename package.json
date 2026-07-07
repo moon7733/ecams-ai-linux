@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "build:cm": "esbuild src/cm-entry.mjs --bundle --format=iife --global-name=CMView --outfile=public/cm.bundle.js --minify --legal-comments=none"
+    "build:cm": "esbuild src/cm-entry.mjs --bundle --format=iife --global-name=CMView --outfile=public/cm.bundle.js --minify --legal-comments=none",
+    "migrate:chat-history": "node scripts/migrateChatHistoryToPostgres.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -19,6 +20,7 @@
     "multer": "^2.1.1",
     "node-pty": "^1.1.0",
     "officeparser": "^7.2.1",
+    "pg": "^8.22.0",
     "tree-sitter": "^0.21.1",
     "tree-sitter-java": "^0.21.0",
     "tree-sitter-javascript": "^0.21.4",

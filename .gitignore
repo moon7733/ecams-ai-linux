@@ -31,4 +31,5 @@ scratch/
 repo-map-poc/results/
 workspace/
 backup/
+postgres-data/
 *.log

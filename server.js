@@ -24,6 +24,7 @@ const { getRepoLevel, getUserRepos, getUserRepoMap } = require('./permissions');
 const { createJob, getJob, getJobStatus, setCurrentProcess, appendChunk, finishJob, failJob, cancelJob, subscribe, unsubscribe, countRunningJobs, getSubscriberCount } = require('./jobsManager');
 const pushManager = require('./pushManager');
 const { dataRoot, isPathInside, repoInfoPath, splitKnownDataPath } = require('./pathUtils');
+const chatHistoryDb = require('./chatHistoryDb');
 
 // 로그에 한국 시간 타임스탬프 추가
 const originalLog = console.log;
@@ -227,7 +228,7 @@ function normalizeChatForStorage(chat, fallbackId) {
   };
 }
 
-function readChatHistory(userId) {
+function readChatHistoryFile(userId) {
   try {
     const file = chatHistoryPath(userId);
     if (!fs.existsSync(file)) return [];
@@ -239,13 +240,30 @@ function readChatHistory(userId) {
   }
 }
 
-function writeChatHistory(userId, chats) {
+function writeChatHistoryFile(userId, chats) {
   fs.mkdirSync(CHAT_HISTORY_DIR, { recursive: true });
   const normalized = (Array.isArray(chats) ? chats : [])
     .map(c => normalizeChatForStorage(c))
     .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
     .slice(-CHAT_HISTORY_LIMIT);
   fs.writeFileSync(chatHistoryPath(userId), JSON.stringify(normalized, null, 2), 'utf8');
+  return normalized;
+}
+
+async function readChatHistory(userId) {
+  const fileChats = readChatHistoryFile(userId);
+  const dbChats = await chatHistoryDb.readChatHistory(userId);
+  if (dbChats === null) return fileChats;
+  if (dbChats.length === 0 && fileChats.length > 0) {
+    await chatHistoryDb.writeChatHistory(userId, fileChats);
+    return fileChats;
+  }
+  return dbChats.map(c => normalizeChatForStorage(c)).slice(-CHAT_HISTORY_LIMIT);
+}
+
+async function writeChatHistory(userId, chats) {
+  const normalized = writeChatHistoryFile(userId, chats);
+  await chatHistoryDb.writeChatHistory(userId, normalized);
   return normalized;
 }
 
@@ -337,16 +355,16 @@ app.post('/api/logout', (req, res) => {
 // 삭제는 항목을 지우지 않고 deleted:true 툼스톤으로 남긴다 — 여러 기기가 각자 로컬 캐시를 갖고 있어서,
 // 그냥 지우면 아직 그 대화를 캐시에 들고 있는 다른 기기가 다음 동기화 때 그대로 되살려 올린다.
 // 툼스톤 + updatedAt 최신순 우선(last-write-wins)이면 어느 기기가 나중에 델리트해도 항상 이긴다.
-app.get('/api/chat/history', authMiddleware, (req, res) => {
-  res.json({ chats: readChatHistory(req.user.id) });
+app.get('/api/chat/history', authMiddleware, async (req, res) => {
+  res.json({ chats: await readChatHistory(req.user.id) });
 });
 
-app.put('/api/chat/history/:id', authMiddleware, (req, res) => {
+app.put('/api/chat/history/:id', authMiddleware, async (req, res) => {
   const incoming = normalizeChatForStorage(req.body?.chat || req.body, req.params.id);
   if (incoming.id !== String(req.params.id)) {
     return res.status(400).json({ error: '대화 ID가 일치하지 않습니다.' });
   }
-  const chats = readChatHistory(req.user.id);
+  const chats = await readChatHistory(req.user.id);
   const existing = chats.find(c => c.id === incoming.id);
   // 이미 더 최신(또는 동시) 상태가 저장돼 있으면(다른 기기의 삭제 포함) 오래된 요청은 무시
   if (existing && (existing.updatedAt || 0) >= (incoming.updatedAt || 0)) {
@@ -354,15 +372,15 @@ app.put('/api/chat/history/:id', authMiddleware, (req, res) => {
   }
   const next = chats.filter(c => c.id !== incoming.id);
   next.push(incoming);
-  res.json({ chats: writeChatHistory(req.user.id, next) });
+  res.json({ chats: await writeChatHistory(req.user.id, next) });
 });
 
-app.delete('/api/chat/history/:id', authMiddleware, (req, res) => {
-  const chats = readChatHistory(req.user.id);
+app.delete('/api/chat/history/:id', authMiddleware, async (req, res) => {
+  const chats = await readChatHistory(req.user.id);
   const tombstone = { id: String(req.params.id), title: '', messages: [], updatedAt: Date.now(), deleted: true };
   const next = chats.filter(c => c.id !== tombstone.id);
   next.push(tombstone);
-  res.json({ chats: writeChatHistory(req.user.id, next) });
+  res.json({ chats: await writeChatHistory(req.user.id, next) });
 });
 
 // 고객사 목록 (회원가입 폼용, 인증 불필요)
