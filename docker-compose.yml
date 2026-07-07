@@ -19,7 +19,7 @@ services:
       - BACKUP_DIR=/app/backup
       - PGHOST=${PGHOST:-192.168.0.21}
       - PGPORT=${PGPORT:-5432}
-      - PGDATABASE=${PGDATABASE:-azbrain}
+      - PGDATABASE=${PGDATABASE:-postgres}
       - PGUSER=${PGUSER:-azbrain}
       - PGPASSWORD=${PGPASSWORD:-}
     restart: unless-stopped

@@ -46,6 +46,7 @@
 ## 2026-07-07 (오후 — PostgreSQL 서버 정정)
 
 - 사용자가 지정한 실제 PostgreSQL 대상은 Docker 내부 DB가 아니라 192.168.0.21 서버다.
+- 실제 접속 기본값은 `PGHOST=192.168.0.21`, `PGDATABASE=postgres`, `PGUSER=azbrain`이다.
 - 로컬 Docker Postgres는 smoke 검증용으로만 사용한 것으로 정정했다.
 - docker-compose에서 로컬 postgres 서비스를 제거하고, `ecams-ai` 컨테이너가 `PGHOST=192.168.0.21` 외부 DB에 접속하도록 수정했다.
 - 외부 DB는 docker-entrypoint init SQL이 실행되지 않으므로, 앱 연결 시 `db/init/001_chat_history.sql`을 실행해 chat history 스키마를 보장하도록 했다.
