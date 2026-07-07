@@ -9,3 +9,10 @@
 - 인덱스, 위키, graphify, workspace 원본처럼 큰 산출물은 1차에서 파일시스템에 유지한다.
 - Node 기반 분석 빌더는 즉시 Java로 재작성하지 않고 Spring Boot에서 외부 프로세스 또는 별도 worker로 호출하는 방식을 우선 검토한다.
 - 예상 기간은 최소 2주, 기능 보존과 운영 마이그레이션을 포함하면 2주에서 4주 이상으로 잡는다.
+
+## 2026-07-07
+
+- 1차 마이그레이션 PoC는 신규 Spring Boot 코드보다 먼저 Node 스크립트로 작성했다. 현재 런타임에 이미 `pg` 의존성이 있고, 실제 원본 JSON 구조를 그대로 읽어 검증하기 쉽기 때문이다.
+- 사용자, 고객사, 저장소, 레포 권한, 고객사 권한, 접근 요청은 `db/init/002_core_identity.sql` 기준으로 매핑한다.
+- `repos.json`의 `companyId: "none"`은 외래키를 깨지 않도록 `repositories.company_id = null`로 저장한다.
+- 가입 요청 payload에는 평문 비밀번호 원문을 남기지 않는다.

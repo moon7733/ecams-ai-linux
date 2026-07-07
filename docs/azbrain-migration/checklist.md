@@ -26,7 +26,7 @@
 
 - [ ] Spring Boot 프로젝트 생성 방식 확정.
 - [ ] Spring Security + JWT 인증 구현.
-- [ ] users.json, companies.json, repos.json → PostgreSQL 이전 스크립트.
+- [x] users.json, companies.json, repos.json → PostgreSQL 이전 스크립트.
 - [ ] Vue 3 프로젝트 생성 방식 확정.
 - [ ] 기존 핵심 화면(소스 업로드, 분석, 채팅, 결과 조회) Vue 3 재구축.
 - [ ] Spring Boot ↔ Node worker 간 REST 연결.

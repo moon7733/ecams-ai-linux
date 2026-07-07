@@ -51,3 +51,10 @@
 - docker-compose에서 로컬 postgres 서비스를 제거하고, `ecams-ai` 컨테이너가 `PGHOST=192.168.0.21` 외부 DB에 접속하도록 수정했다.
 - 외부 DB는 docker-entrypoint init SQL이 실행되지 않으므로, 앱 연결 시 `db/init/001_chat_history.sql`을 실행해 chat history 스키마를 보장하도록 했다.
 - 테이블 생성이 `/api/chat/history` 첫 호출 전까지 지연되지 않도록, 서버 기동 시 `chatHistoryDb.init()`으로 스키마 생성 여부를 바로 확인하도록 보강했다.
+
+## 2026-07-07 (2단계 착수)
+
+- 2단계 첫 작업은 Spring Boot/Vue 뼈대보다 먼저 사용자, 고객사, 저장소 메타데이터의 PostgreSQL 이관 토대를 확정하는 것으로 잡았다.
+- `db/init/002_core_identity.sql`에 `users`, `companies`, `repositories`, 권한 매핑, `access_requests` 테이블을 추가했다.
+- `scripts/migrateCoreJsonToPostgres.js`를 추가해 `users.json`, `companies.json`, `repos.json`, `requests.json`을 재실행 가능한 upsert 방식으로 이전하도록 했다.
+- `requests.json`에는 과거 가입 요청의 평문 비밀번호가 섞여 있어 `payload_json` 저장 시 `password` 원문은 제외하고 `passwordMigrated: true` 표시만 남기도록 했다.
