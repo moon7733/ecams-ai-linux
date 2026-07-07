@@ -151,6 +151,7 @@ async function writeChatHistory(userId, chats) {
 }
 
 module.exports = {
+  init: ensureReady,
   readChatHistory,
   writeChatHistory,
 };

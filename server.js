@@ -269,6 +269,9 @@ async function writeChatHistory(userId, chats) {
 
 loadData();
 resetLeftoverDenies(); // 이전 비정상 종료로 남은 workspace 쓰기거부 ACL 정리 (함수 hoisting)
+chatHistoryDb.init().then(ok => {
+  if (ok) console.log('[ChatHistoryDB] PostgreSQL ready');
+});
 
 // 평문 비밀번호 자동 해싱 (최초 1회 마이그레이션)
 (function migratePasswords() {

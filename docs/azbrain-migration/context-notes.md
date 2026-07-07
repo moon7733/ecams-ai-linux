@@ -50,3 +50,4 @@
 - 로컬 Docker Postgres는 smoke 검증용으로만 사용한 것으로 정정했다.
 - docker-compose에서 로컬 postgres 서비스를 제거하고, `ecams-ai` 컨테이너가 `PGHOST=192.168.0.21` 외부 DB에 접속하도록 수정했다.
 - 외부 DB는 docker-entrypoint init SQL이 실행되지 않으므로, 앱 연결 시 `db/init/001_chat_history.sql`을 실행해 chat history 스키마를 보장하도록 했다.
+- 테이블 생성이 `/api/chat/history` 첫 호출 전까지 지연되지 않도록, 서버 기동 시 `chatHistoryDb.init()`으로 스키마 생성 여부를 바로 확인하도록 보강했다.
