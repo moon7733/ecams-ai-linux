@@ -24,14 +24,14 @@
 
 ## 2단계: Spring Boot 정문 + Vue 3 UI
 
-- [ ] Spring Boot 프로젝트 생성 방식 확정.
-- [ ] Spring Security + JWT 인증 구현.
+- [x] Spring Boot 프로젝트 생성 방식 확정.
+- [x] Spring Security + JWT 인증 구현.
 - [x] users.json, companies.json, repos.json → PostgreSQL 이전 스크립트.
 - [ ] Vue 3 프로젝트 생성 방식 확정.
 - [ ] 기존 핵심 화면(소스 업로드, 분석, 채팅, 결과 조회) Vue 3 재구축.
 - [ ] Spring Boot ↔ Node worker 간 REST 연결.
 - [x] 스트리밍 경로 결정. 1차는 분석 스트리밍만 Node 경유, 포트는 프록시로 숨김.
-- [ ] docker-compose에 Spring Boot 컨테이너 추가.
+- [x] docker-compose에 Spring Boot 컨테이너 추가.
 
 ## 3단계: pgvector 자동분류 · 의미검색
 

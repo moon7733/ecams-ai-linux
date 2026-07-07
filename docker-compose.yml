@@ -1,5 +1,20 @@
 
 services:
+  azbrain-api:
+    build: ./backend
+    container_name: azbrain-api
+    ports:
+      - "${AZBRAIN_API_PORT:-8081}:8080"
+    environment:
+      - PORT=8080
+      - PGHOST=${PGHOST:-192.168.0.21}
+      - PGPORT=${PGPORT:-5432}
+      - PGDATABASE=${PGDATABASE:-postgres}
+      - PGUSER=${PGUSER:-azbrain}
+      - PGPASSWORD=${PGPASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-change-me}
+    restart: unless-stopped
+
   ecams-ai:
     build: .
     container_name: ecams-ai-linux

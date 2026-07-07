@@ -58,3 +58,11 @@
 - `db/init/002_core_identity.sql`에 `users`, `companies`, `repositories`, 권한 매핑, `access_requests` 테이블을 추가했다.
 - `scripts/migrateCoreJsonToPostgres.js`를 추가해 `users.json`, `companies.json`, `repos.json`, `requests.json`을 재실행 가능한 upsert 방식으로 이전하도록 했다.
 - `requests.json`에는 과거 가입 요청의 평문 비밀번호가 섞여 있어 `payload_json` 저장 시 `password` 원문은 제외하고 `passwordMigrated: true` 표시만 남기도록 했다.
+
+## 2026-07-07 (Spring Boot 뼈대)
+
+- Spring Boot 프로젝트는 `backend/` 하위 독립 Maven 모듈로 둔다. 기존 Node 서버는 분석 worker 및 현행 운영 경로로 유지한다.
+- Java 기준은 전환 계획대로 21로 잡고, 로컬에 Maven/Java 21이 없어 Docker 멀티스테이지 빌드를 기본 검증 경로로 둔다.
+- 첫 API 범위는 기존 화면 영향이 작은 `/api/login`, `/api/companies`, `/api/repos/all`, `/api/repos`로 제한했다.
+- JWT는 외부 JWT 라이브러리 없이 HMAC-SHA256 표준 구현으로 발급·검증한다. 기존 bcrypt hash는 Spring Security `BCryptPasswordEncoder`로 검증한다.
+- docker-compose에 `azbrain-api` 서비스를 추가했지만 Node `ecams-ai` 서비스는 그대로 유지한다. 호스트 기본 포트는 8080 충돌을 피하려고 8081로 둔다.

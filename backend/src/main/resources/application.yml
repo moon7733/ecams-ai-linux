@@ -1,0 +1,18 @@
+# Spring Boot API의 기본 런타임 설정
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: azbrain-api
+  datasource:
+    url: jdbc:postgresql://${PGHOST:192.168.0.21}:${PGPORT:5432}/${PGDATABASE:postgres}
+    username: ${PGUSER:azbrain}
+    password: ${PGPASSWORD:}
+    hikari:
+      maximum-pool-size: ${PGPOOL_MAX:5}
+
+azbrain:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-change-me}
+    ttl-seconds: ${JWT_TTL_SECONDS:86400}
