@@ -24,14 +24,6 @@ WORKDIR /app
 COPY --chown=node:node package*.json ./
 RUN npm install
 
-# AGY(Antigravity) CLI 설치 (리눅스용)
-RUN set -eux; \
-    tmp="$(mktemp -d)"; \
-    curl -fsSL "$AGY_CLI_INSTALL_URL" -o "$tmp/install.sh"; \
-    bash "$tmp/install.sh" --dir /usr/local/bin; \
-    rm -rf "$tmp"; \
-    /usr/local/bin/agy --version
-
 # 소스코드 복사
 COPY --chown=node:node . .
 
@@ -39,7 +31,16 @@ COPY --chown=node:node . .
 RUN chown -R node:node /app
 USER node
 
+# AGY(Antigravity) CLI 설치 (node 계정으로 설치)
+RUN set -eux; \
+    tmp="$(mktemp -d)"; \
+    curl -fsSL "$AGY_CLI_INSTALL_URL" -o "$tmp/install.sh"; \
+    bash "$tmp/install.sh"; \
+    rm -rf "$tmp"; \
+    /home/node/.local/bin/agy --version
+
 # 환경변수 설정
+ENV PATH="/home/node/.local/bin:${PATH}"
 ENV PORT=3000
 ENV WORKSPACE_DIR=/app/workspace
 ENV BACKUP_DIR=/app/backup
