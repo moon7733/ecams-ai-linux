@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# OS 의존성 설치 (Puppeteer용 Chromium, Git, Tree-sitter 빌드용 g++/python)
+# OS dependencies for Puppeteer/Chromium, Git, and native npm packages.
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
@@ -17,21 +17,22 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 ARG AGY_CLI_INSTALL_URL="https://antigravity.google/cli/install.sh"
+ARG APP_UID=1008
+ARG APP_GID=1015
 
 WORKDIR /app
 
-# 패키지 설치
-COPY --chown=node:node package*.json ./
-RUN npm install
+RUN groupmod -g "${APP_GID}" node \
+    && usermod -u "${APP_UID}" -g "${APP_GID}" node \
+    && chown -R node:node /app /home/node
 
-# 소스코드 복사
-COPY --chown=node:node . .
-
-# 디렉토리 권한 설정 및 사용자 변경 (추후 생성되는 파일들이 node 권한을 갖도록)
-RUN chown -R node:node /app
 USER node
 
-# AGY(Antigravity) CLI 설치 (node 계정으로 설치)
+# Install npm dependencies before copying source so app edits reuse this layer.
+COPY --chown=node:node package*.json ./
+RUN npm ci
+
+# Install AGY before copying source so app edits reuse this layer.
 RUN set -eux; \
     tmp="$(mktemp -d)"; \
     curl -fsSL "$AGY_CLI_INSTALL_URL" -o "$tmp/install.sh"; \
@@ -39,11 +40,12 @@ RUN set -eux; \
     rm -rf "$tmp"; \
     /home/node/.local/bin/agy --version
 
-# 환경변수 설정
 ENV PATH="/home/node/.local/bin:${PATH}"
 ENV PORT=3000
 ENV WORKSPACE_DIR=/app/workspace
 ENV BACKUP_DIR=/app/backup
+
+COPY --chown=node:node . .
 
 EXPOSE 3000
 
