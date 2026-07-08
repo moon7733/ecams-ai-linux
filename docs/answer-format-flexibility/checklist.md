@@ -17,4 +17,7 @@
 - [x] `node --check server.js` 통과, 인라인 스크립트 2개 `new Function()` 문법 검사 통과.
 - [x] 격리 스크립트로 정규식 5개 시나리오(정상/공백변형/마커뒤텍스트있음/마커없음/다중파일) 검증 — 그레이스풀 디그레이드 확인.
 - [x] puppeteer E2E — 실행 중인 서버(pm2, `http://localhost:5000/`)에 합성 답변을 `appendMessageDOM`으로 주입해 렌더/보기/다운로드 3단계 전부 검증. 한글 라운드트립(`btoa(unescape(encodeURIComponent))`→`atob`→`TextDecoder`) 포함 통과, 페이지 에러 0건. 스크립트는 `scratch/newfile_e2e_probe.js`(미커밋).
-- [ ] 실사용 검증 대기 — server.js는 pm2 재시작 필요(프롬프트 변경 반영), 모델이 실제로 `newfile:///` 컨벤션을 지키는지는 라이브에서만 확인 가능.
+- [x] pm2로 `ecams-bot` 시작 후 `http://127.0.0.1:5000/` 200 확인.
+- [x] 실행 중 서버에서 `scratch/newfile_e2e_probe.js` Puppeteer E2E 재검증 — 렌더/보기/다운로드/한글 라운드트립 통과, 페이지 에러 0건.
+- [ ] 실제 모델 답변이 `newfile:///` 컨벤션을 지키는지 실사용 검증 대기.
+
