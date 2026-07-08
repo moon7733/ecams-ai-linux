@@ -1,4 +1,4 @@
-/* Azbrain 첫 Vue 화면의 기본 레이아웃과 상태 표시 스타일 */
+/* Azbrain 2단계 확인 화면의 기본 레이아웃과 상태 표시 스타일. */
 :root {
   color: #1f2933;
   background: #f6f8fb;
@@ -14,12 +14,13 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
 .shell {
-  width: min(1120px, calc(100% - 32px));
+  width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0;
 }
@@ -56,7 +57,8 @@ h2 {
 }
 
 .secondary,
-button[type="submit"] {
+button[type="submit"],
+.actions button {
   border: 0;
   border-radius: 8px;
   background: #285f7f;
@@ -83,7 +85,8 @@ button:disabled {
 }
 
 .status-panel,
-.pane {
+.pane,
+.analysis-panel {
   border: 1px solid #d8e0e8;
   border-radius: 8px;
   background: white;
@@ -96,7 +99,7 @@ button:disabled {
 .status-panel strong {
   display: block;
   margin: 8px 0 4px;
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .label,
@@ -112,8 +115,9 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
+  margin-bottom: 16px;
 }
 
 .pane {
@@ -132,7 +136,13 @@ button:disabled {
 .list {
   display: grid;
   gap: 1px;
+  max-height: 420px;
+  overflow: auto;
   background: #e8edf2;
+}
+
+.compact-list {
+  max-height: 280px;
 }
 
 .row {
@@ -143,6 +153,23 @@ button:disabled {
   min-width: 0;
   background: white;
   padding: 12px 16px;
+}
+
+.check-row {
+  cursor: pointer;
+}
+
+.check-row span:first-child {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.check-row small {
+  grid-column: 2;
+  color: #617180;
 }
 
 .row strong,
@@ -184,11 +211,39 @@ button:disabled {
   font-weight: 700;
 }
 
-.login-form input {
+.login-form input,
+.analysis-panel textarea {
   width: 100%;
   border: 1px solid #c9d4df;
   border-radius: 8px;
   padding: 10px 12px;
+}
+
+.analysis-panel {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.analysis-panel textarea,
+.actions,
+.answer {
+  margin-inline: 16px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.answer {
+  max-height: 420px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #f4f7fa;
+  color: #22313d;
+  padding: 14px;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 820px) {

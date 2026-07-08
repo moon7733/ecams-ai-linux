@@ -20,7 +20,7 @@
 - [x] DB 연결 실패 시 기존 파일 저장소 fallback 유지.
 - [x] logs/chat_history/*.json → PostgreSQL 이전 스크립트 추가.
 - [x] PostgreSQL DB 어댑터 쓰기/읽기 smoke 검증.
-- [ ] 앱 API 통합 검증.
+- [x] 앱 API 통합 검증.
 
 ## 2단계: Spring Boot 정문 + Vue 3 UI
 

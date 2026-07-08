@@ -72,3 +72,15 @@
 - Vue 3 프로젝트는 `frontend/` 독립 Vite 모듈로 둔다. 기존 `public/index.html`은 아직 운영 화면으로 유지한다.
 - 첫 화면은 마케팅 페이지가 아니라 Spring Boot API 연결 확인 화면으로 만들었다. 브라우저에서 고객사 조회, 로그인, 저장소 권한 조회를 바로 확인할 수 있다.
 - docker-compose에는 `azbrain-web` 서비스를 추가하고 기본 호스트 포트는 8082로 둔다. nginx가 `/api`를 `azbrain-api:8080`으로 프록시한다.
+
+## 2026-07-07 (API 계약 비교)
+
+- Spring으로 이식한 API가 기존 Node 응답 계약과 맞는지 확인하기 위해 `npm run verify:api-contract`를 추가했다.
+- 기본 비교 범위는 `/api/companies`, `/api/login`, `/api/repos/all`, `/api/repos`다.
+- 기존 Node 서버가 떠 있지 않은 환경에서도 스크립트 자체 검증은 `NODE_API_BASE=http://localhost:8081 SPRING_API_BASE=http://localhost:8081`처럼 같은 대상끼리 비교해서 수행할 수 있다.
+
+## 2026-07-08 (2단계 Vue 핵심 흐름 1차)
+
+- Vue 화면을 단순 API smoke에서 고객사 조회, Spring 로그인, Node worker 로그인, 저장소 선택, 분석 질문 요청, job polling까지 이어지는 1차 업무 흐름으로 확장했다.
+- 1차 분석 경로는 Spring 토큰을 Node에 강제로 공유하지 않고, nginx /node-api/ 프록시를 통해 기존 Node worker API에 별도 로그인한 토큰으로 호출한다.
+- 이 방식은 기존 Node 분석 엔진을 유지하면서 Vue 화면에서 실제 분석 요청을 검증하기 위한 중간 단계다. Spring 내부에서 Node를 서버 대 서버로 호출하는 구조는 이후 별도 API gateway 설계 때 결정한다.

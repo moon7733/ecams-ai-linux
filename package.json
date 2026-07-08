@@ -5,7 +5,8 @@
   "scripts": {
     "build:cm": "esbuild src/cm-entry.mjs --bundle --format=iife --global-name=CMView --outfile=public/cm.bundle.js --minify --legal-comments=none",
     "migrate:chat-history": "node scripts/migrateChatHistoryToPostgres.js",
-    "migrate:core-json": "node scripts/migrateCoreJsonToPostgres.js"
+    "migrate:core-json": "node scripts/migrateCoreJsonToPostgres.js",
+    "verify:api-contract": "node scripts/compareApiContracts.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

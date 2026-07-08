@@ -28,3 +28,15 @@
 - Vue 3 전환 구조는 `frontend/` 독립 Vite 모듈로 확정했다.
 - 첫 화면은 신규 API smoke를 사람이 브라우저에서 확인하는 용도다. 기존 대형 HTML 화면을 바로 분해하지 않고, DB 기반 Spring API 연결 검증을 먼저 안정화한다.
 - 프로덕션 컨테이너는 nginx로 정적 파일을 제공하고 `/api` 요청만 Spring Boot 서비스로 프록시한다.
+
+## 2026-07-07
+
+- 기존 Node API와 신규 Spring API의 핵심 응답 계약 비교는 `scripts/compareApiContracts.js`로 자동화한다.
+- 비교 대상은 현재 Spring으로 이식한 `/api/companies`, `/api/login`, `/api/repos/all`, `/api/repos`로 제한한다.
+- 기본 비교 주소는 Node `http://localhost:3000`, Spring `http://localhost:8081`이다. 필요하면 `NODE_API_BASE`, `SPRING_API_BASE`, `API_COMPARE_USER`, `API_COMPARE_PASSWORD` 환경변수로 바꾼다.
+
+## 2026-07-08
+
+- Node 분석 빌더는 재작성하지 않고 기존 Node worker로 유지한다.
+- Vue 3 화면은 Spring API로 인증과 저장소 권한을 확인하고, /node-api/ nginx 프록시를 통해 기존 /api/chat job 기반 분석 요청을 수행한다.
+- 프런트 빌드 검증은 `npm run build`로 통과했다.
