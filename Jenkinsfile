@@ -13,10 +13,10 @@ pipeline {
   }
 
   environment {
-    DEPLOY_HOST = '192.168.0.11'
+    DEPLOY_HOST = '192.168.0.21'
     DEPLOY_USER = 'azbrain'
-    DEPLOY_DIR = '/SW2/azbrain'
-    DEPLOY_PORT = '3000'
+    DEPLOY_DIR = '/home/azbrain/azbrain'
+    DEPLOY_PORT = '13000'
     DEPLOY_CREDENTIALS_ID = 'azbrain-deploy-ssh-key'
   }
 
