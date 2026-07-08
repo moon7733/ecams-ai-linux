@@ -2017,9 +2017,9 @@ async function prepareShadows(allowedRepos) {
 }
 
 // agy CLI 통합 — 결정 11 (2026-06-01): node-pty 로 ConPTY wrapping. raw spawn 은 stdout TTY 미감지 시 응답 직전 셧다운 (silent fail). docs/agy-integration/context-notes.md 참고.
-const AGY_EXE = process.platform === 'win32'
+const AGY_EXE = process.env.AGY_EXE_PATH || (process.platform === 'win32'
   ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
-  : (process.env.AGY_EXE_PATH || '/usr/local/bin/agy');
+  : 'agy');
 const CODEX_EXE = process.env.CODEX_EXE || path.join(os.homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'd8dfab353c0001dc', 'codex.exe');
 
 // AGY 비결정성: 분석을 끝내지 않고 짧은 영문 placeholder("I am waiting for the ... search to complete...")만 내고 종료하는 bail 감지.
@@ -2136,9 +2136,15 @@ function runAgyOnce(fullPrompt, res, cwd, includeDirs, req = null) {
 
     term.onExit(({ exitCode }) => {
       try { fs.unlinkSync(promptFile); } catch {}
-      const clean = stripAgyPreamble(stripAnsi(buf).trim());
+      const rawOutput = stripAnsi(buf);
+      const clean = stripAgyPreamble(rawOutput.trim());
       state.answer = clean;
       state.duration_ms = Date.now() - startTime;
+      if (exitCode !== 0 && /execvp\(3\) failed|No such file or directory/i.test(rawOutput)) {
+        state.errorMsg = `AGY executable not found: ${AGY_EXE}`;
+      } else if (exitCode !== 0 && /authentication failed or timed out/i.test(rawOutput)) {
+        state.errorMsg = 'AGY authentication failed or timed out';
+      }
       // bailType: 재시도 래퍼가 timeout(재시도 안 함) vs text-bail(재시도)을 구분하는 근거.
       const bail = isAgyBail(clean, exitCode);
       state.bailType = exitCode !== 0 ? 'timeout' : (bail ? 'text-bail' : 'ok');
@@ -2181,7 +2187,7 @@ function runAgyStream(prompt, res, allowedRepos = [], overallStartTime = null, r
 
     // 비정상 종료(code!==0) 안내는 runAgyWithRetry 가 buckets(인프라 에러 / timeout)로 전담 — 여기서 중복 write 하지 않음.
     res.write('data: ' + JSON.stringify({ type: 'elapsed', seconds: elapsed, usage: null }) + '\n\n');
-    resolve({ answer: state.answer.trim(), code, bailType: state.bailType, durationMs: state.duration_ms });
+    resolve({ answer: state.answer.trim(), code, bailType: state.bailType, durationMs: state.duration_ms, errorMsg: state.errorMsg });
   });
 }
 
@@ -2198,7 +2204,7 @@ async function runAgyWithRetry(prompt, res, allowedRepos, overallStartTime, req,
       const nudge = `[시스템 긴급 지시사항]\n이전 분석 시도에서 코드를 제대로 찾지 못해 실패했습니다.\n이번 시도에서는 절대 포기하거나 "알 수 없다"고 하지 마십시오. 주어진 파일들을 끝까지 파고들어 문제의 원인을 반드시 찾아내서 한국어로 상세히 답변하십시오.\n\n`;
       currentPrompt = nudge + prompt;
     }
-    const { answer, code, bailType, durationMs } = await runAgyStream(currentPrompt, res, allowedRepos, overallStartTime, req);
+    const { answer, code, bailType, durationMs, errorMsg } = await runAgyStream(currentPrompt, res, allowedRepos, overallStartTime, req);
 
     // 버킷 A: 인프라 실패(엔진 미기동, 리눅스 명령어 없음(127), spawn/write 실패 → code=-1). "질문 좁혀달라"는 오해 유발 → 별도 문구, 재시도 안 함.
     if (code === -1 || code === 127) {
@@ -2208,7 +2214,19 @@ async function runAgyWithRetry(prompt, res, allowedRepos, overallStartTime, req,
     }
     // 버킷 B: timeout 등 비정상 종료(code!==0). agy 는 돌았으나 5분 내 완결 실패 → 재시도 안 함(사용자 승인), 범위 축소 안내.
     if (code !== 0) {
-      logAgy(`GIVEUP_TIMEOUT code=${code} attempt=${attempt}`);
+      if (/AGY executable not found|spawn failed/i.test(errorMsg || '')) {
+        const errMsg = `⚠️ 분석 엔진(AGY) 실행파일을 찾지 못했습니다. 컨테이너 안에서 AGY_EXE_PATH 또는 PATH 설정을 확인해 주세요. 현재 경로: ${AGY_EXE}`;
+        logAgy(`GIVEUP_INFRA error=${JSON.stringify(errorMsg)} attempt=${attempt}`);
+        res.write('data: ' + JSON.stringify({ type: 'text', text: errMsg }) + '\n\n');
+        return errMsg;
+      }
+      if (/authentication failed/i.test(errorMsg || '')) {
+        const errMsg = '⚠️ 분석 엔진(AGY) 인증이 실패했거나 만료되었습니다. 컨테이너 안의 AGY 로그인 상태를 확인해 주세요.';
+        logAgy(`GIVEUP_AUTH error=${JSON.stringify(errorMsg)} attempt=${attempt}`);
+        res.write('data: ' + JSON.stringify({ type: 'text', text: errMsg }) + '\n\n');
+        return errMsg;
+      }
+      logAgy(`GIVEUP_TIMEOUT code=${code} attempt=${attempt} error=${JSON.stringify(errorMsg || '')}`);
       res.write('data: ' + JSON.stringify({ type: 'text', text: SCOPE_GUIDE }) + '\n\n');
       return SCOPE_GUIDE;
     }
