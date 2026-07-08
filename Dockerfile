@@ -21,7 +21,7 @@ ARG AGY_CLI_INSTALL_URL="https://antigravity.google/cli/install.sh"
 WORKDIR /app
 
 # 패키지 설치
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 RUN npm install
 
 # AGY(Antigravity) CLI 설치 (리눅스용)
@@ -33,7 +33,11 @@ RUN set -eux; \
     /usr/local/bin/agy --version
 
 # 소스코드 복사
-COPY . .
+COPY --chown=node:node . .
+
+# 디렉토리 권한 설정 및 사용자 변경 (추후 생성되는 파일들이 node 권한을 갖도록)
+RUN chown -R node:node /app
+USER node
 
 # 환경변수 설정
 ENV PORT=3000
