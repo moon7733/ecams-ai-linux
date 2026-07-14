@@ -62,20 +62,32 @@ async function withRetry(fn) {
   return last;
 }
 
-const CLASSIFY_INSTRUCTION = [
-  '당신은 SI 프로젝트 인수인계 메모 분류기다. 아래 <DUMP>의 각 정보 조각을 분류해 JSON 배열로만 출력한다.',
-  '각 원소: {"target","key","title","body","tag"}',
-  '- target: "info" | "knowledge" | "credential".',
-  '- "info": 값이 아래 필드 중 하나에 정확히 해당할 때만. key 는 "DB","WAS","SCM","SERVER_IP","LOGIN_STEPS" 중 하나. body 는 값만.',
-  '- "credential": 비밀번호 등 민감정보. tag="접속 정보".',
-  '- 그 외 운영절차·특이사항은 "knowledge". key=null, title=짧은 제목, body=내용, tag=짧은 분류어.',
-  '- 확실치 않으면 "knowledge".',
-  '- 매우 중요: <DUMP>에 실제로 있는 내용만 다뤄라. 없는 정보를 추측·생성·추가하지 마라. 입력의 모든 조각을 빠뜨리지 마라.',
-  '오직 JSON 배열만.'
-].join('\n');
+// 흔한 카테고리(일관성용 어휘). AI는 여기 맞는 게 있으면 재사용하고, 없으면 내용에 맞는 새 카테고리를 만든다.
+const COMMON_CATEGORIES = [
+  '접속 정보', '운영 절차', '배포 절차', '방화벽·네트워크', '형상관리', '서버·인프라',
+  '일정·회의', '이슈·장애', '요구사항', '특이사항', '인수인계'
+];
+function classifyInstruction(knownTags = []) {
+  const cats = Array.from(new Set([...(knownTags || []), ...COMMON_CATEGORIES]));
+  return [
+    '당신은 SI 프로젝트 인수인계 메모 분류기다. 아래 <DUMP>의 각 정보 조각을 분류해 JSON 배열로만 출력한다.',
+    '각 원소: {"target","key","title","body","tag"}',
+    '- target: "info" | "knowledge" | "credential".',
+    '- "info": 값이 아래 정형 필드에 해당할 때(문장 속에 값이 있으면 값만 뽑아 body에). key는 "DB","WAS","SCM","SERVER_IP","LOGIN_STEPS" 중 하나.',
+    '  예: "와스는 웹로직 씀" → {target:"info", key:"WAS", body:"WebLogic"}.',
+    '- "credential": 비밀번호 등 민감정보. tag="접속 정보".',
+    '- 그 외는 "knowledge". key=null, title=짧은 제목, body=내용 전문.',
+    '  tag는 내용에 맞는 **구체적 카테고리**를 붙여라. 아래 기존 카테고리에 맞는 게 있으면 반드시 그걸 재사용하고(일관성), 없을 때만 내용에 맞는 새 카테고리를 만들어라:',
+    `  [${cats.join(', ')}]`,
+    '  "메모","기타","정보" 같은 막연한 태그 금지 — 최대한 구체적으로.',
+    '- 확실치 않으면 "knowledge".',
+    '- 매우 중요: <DUMP>에 실제로 있는 내용만. 없는 정보를 추측·생성하지 마라. 입력의 모든 조각을 빠뜨리지 마라.',
+    '오직 JSON 배열만.'
+  ].join('\n');
+}
 
-async function classifyText(text) {
-  const prompt = `${CLASSIFY_INSTRUCTION}\n<DUMP>\n${text}\n</DUMP>`;
+async function classifyText(text, knownTags = []) {
+  const prompt = `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`;
   const t0 = Date.now();
   const res = await withRetry(() => callGemini([{ text: prompt }], { model: TEXT_MODEL, maxOutputTokens: 2048, timeoutMs: 15000 }));
   const items = parseArray(res.text);
