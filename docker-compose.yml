@@ -51,3 +51,19 @@ services:
       - PGUSER=${PGUSER:-azbrain}
       - PGPASSWORD=${PGPASSWORD:-}
     restart: unless-stopped
+
+  pms-bridge:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1008}
+        APP_GID: ${APP_GID:-1015}
+    container_name: pms-bridge
+    command: ["node", "pmsBridge.js"]
+    ports:
+      - "${PMS_BRIDGE_PORT:-8790}:8790"
+    environment:
+      - PMS_BRIDGE_PORT=8790
+      - PMS_BRIDGE_TOKEN=${PMS_BRIDGE_TOKEN:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
