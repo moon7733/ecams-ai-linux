@@ -7,6 +7,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // 텍스트 분류: flash-lite 는 환각(입력에 없는 항목 생성·실제 항목 누락) 확인 → 2.5-flash 로 충실도 확보(실측 ~1.5s).
 // WBS 비전: flash-lite 로도 29행 정확 추출(~7s) → 저렴한 lite 유지.
@@ -122,4 +123,76 @@ async function extractWbs(imageBase64, mime = 'image/jpeg') {
   return { rows, notes: obj?.notes || [], elapsedMs: Date.now() - t0, model: VISION_MODEL, err: rows ? null : (res.err || 'no JSON') };
 }
 
-module.exports = { loadKey, callGemini, classifyText, extractWbs, TEXT_MODEL, VISION_MODEL };
+// ── agy(월정액 세션) 백엔드 — API 키 쿼터 초과 시 폴백용 ────────────────────
+// agy = Gemini 기반 에이전트 CLI. node-pty 로 print 모드 원샷 실행(server.js runAgyOnce 패턴).
+// 무료 API 키(분당 20회)와 달리 월정액이라 쿼터 넉넉. 대신 수초~수십초 + 가끔 재시도.
+const AGY_EXE = process.env.AGY_EXE_PATH || (process.platform === 'win32'
+  ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
+  : 'agy');
+
+let _pty = null;
+function getPty() {
+  if (_pty === null) { try { _pty = require('node-pty'); } catch { _pty = false; } }
+  return _pty;
+}
+
+function cleanAnsi(s) {
+  return String(s || '')
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    .replace(/\r/g, '');
+}
+
+// agy print 모드 1회 실행 → 원시 출력 수집(비스트리밍). pty 미탑재/실행실패는 err 로 알린다.
+function runAgyPrint(prompt, timeoutMs = 90000) {
+  return new Promise((resolve) => {
+    const pty = getPty();
+    if (!pty) return resolve({ raw: '', err: 'node-pty 미탑재' });
+    let raw = '', done = false, term;
+    const finish = (err) => { if (done) return; done = true; clearTimeout(timer); try { term && term.kill(); } catch {} resolve({ raw, err }); };
+    const timer = setTimeout(() => finish(`agy timeout ${timeoutMs}ms`), timeoutMs);
+    try {
+      term = pty.spawn(AGY_EXE, ['--dangerously-skip-permissions', '--print-timeout', '5m', '-p', prompt],
+        { name: 'xterm-color', cols: 20000, rows: 40, env: process.env });
+    } catch (e) { return finish(`agy spawn 실패: ${e.message}`); }
+    term.onData((d) => { raw += d; });
+    term.onExit(({ exitCode }) => finish(exitCode === 0 || raw ? null : `agy exit ${exitCode}`));
+  });
+}
+
+async function classifyTextAgy(text, knownTags = []) {
+  const prompt = `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`;
+  const t0 = Date.now();
+  let items = null, err = null;
+  for (let attempt = 0; attempt < 2 && !items; attempt++) {   // agy 비결정성 대비 1회 재시도
+    const r = await runAgyPrint(prompt);
+    if (r.err && !r.raw) { err = r.err; continue; }
+    items = parseArray(cleanAnsi(r.raw));
+    if (!items) err = r.err || 'agy: JSON 배열 없음';
+  }
+  return { items, elapsedMs: Date.now() - t0, model: 'agy', err: items ? null : err };
+}
+
+function isQuota(err) { return /RESOURCE_EXHAUSTED|quota|rate.?limit|\b429\b/i.test(err || ''); }
+
+// 하이브리드: API 키 먼저(빠름), 실패(특히 쿼터)면 agy 로 폴백.
+async function classifyHybrid(text, knownTags = []) {
+  const api = await classifyText(text, knownTags);
+  if (api.items) return api;
+  const agy = await classifyTextAgy(text, knownTags);
+  if (agy.items) return { items: agy.items, elapsedMs: agy.elapsedMs, model: 'agy(fallback)', err: null, apiErr: api.err };
+  return { items: null, elapsedMs: (api.elapsedMs || 0) + (agy.elapsedMs || 0), model: 'api+agy', err: `api:${api.err} | agy:${agy.err}` };
+}
+
+// 백엔드 선택: PMS_CLASSIFY_BACKEND = hybrid(기본) | api | agy
+function classify(text, knownTags = []) {
+  const backend = (process.env.PMS_CLASSIFY_BACKEND || 'hybrid').toLowerCase();
+  if (backend === 'api') return classifyText(text, knownTags);
+  if (backend === 'agy') return classifyTextAgy(text, knownTags);
+  return classifyHybrid(text, knownTags);
+}
+
+module.exports = {
+  loadKey, callGemini, classifyText, classifyTextAgy, classifyHybrid, classify,
+  isQuota, extractWbs, TEXT_MODEL, VISION_MODEL, AGY_EXE
+};

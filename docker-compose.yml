@@ -62,8 +62,13 @@ services:
     command: ["node", "pmsBridge.js"]
     ports:
       - "${PMS_BRIDGE_PORT:-8790}:8790"
+    volumes:
+      # AGY 월정액 세션 인증(API 키 쿼터 초과 시 폴백). ecams-ai 와 동일 마운트.
+      - ~/.gemini:/home/node/.gemini
     environment:
       - PMS_BRIDGE_PORT=8790
       - PMS_BRIDGE_TOKEN=${PMS_BRIDGE_TOKEN:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # 분류 백엔드: hybrid(기본, API→agy 폴백) | api | agy
+      - PMS_CLASSIFY_BACKEND=${PMS_CLASSIFY_BACKEND:-hybrid}
     restart: unless-stopped

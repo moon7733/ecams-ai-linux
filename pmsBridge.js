@@ -12,7 +12,7 @@
  * GET  /pms/health                               -> {ok:true}
  */
 const http = require('http');
-const { classifyText, extractWbs, loadKey } = require('./pmsGemini');
+const { classify, extractWbs, loadKey } = require('./pmsGemini');
 
 const PORT = Number(process.env.PMS_BRIDGE_PORT || 8790);
 const TOKEN = process.env.PMS_BRIDGE_TOKEN || '';
@@ -46,7 +46,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url === '/pms/classify') {
       if (!body.text || !body.text.trim()) return send(res, 400, { error: 'text required' });
-      const r = await classifyText(body.text, Array.isArray(body.knownTags) ? body.knownTags : []);
+      const r = await classify(body.text, Array.isArray(body.knownTags) ? body.knownTags : []);
       return r.items ? send(res, 200, r) : send(res, 502, { error: `classify failed: ${r.err}` });
     }
     if (url === '/pms/wbs-vision') {
