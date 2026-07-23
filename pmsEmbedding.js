@@ -16,6 +16,14 @@
 const https = require('https');
 const { loadKey } = require('./pmsGemini');
 
+function boundedInt(name, fallback, min, max) {
+  const value = Number(process.env[name] || fallback);
+  return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
+}
+const EMBED_BATCH_SIZE = boundedInt('PMS_EMBED_BATCH_SIZE', 20, 1, 100);
+const MAX_EMBED_RETRIES = boundedInt('PMS_EMBED_MAX_RETRIES', 3, 0, 10);
+const MAX_RETRY_DELAY_MS = boundedInt('PMS_EMBED_RETRY_MAX_DELAY_MS', 30000, 1000, 120000);
+const MAX_RETRY_BUDGET_MS = boundedInt('PMS_EMBED_RETRY_BUDGET_MS', 60000, 0, 150000);
 const EMBED_MODEL = process.env.PMS_EMBED_MODEL || 'gemini-embedding-001';
 const EMBED_DIM = Number(process.env.PMS_EMBED_DIM || 768);
 const BATCH_SIZE = 64;           // batchEmbedContents 요청당 문서 수(API 상한 100 미만 여유)
@@ -68,14 +76,48 @@ function embedBatch(texts, taskType, timeoutMs = 60000) {
       r.on('end', () => {
         try {
           const j = JSON.parse(b);
-          resolve({ vectors: j.embeddings ? j.embeddings.map((e) => e.values) : null, err: j.error && j.error.message });
+          const err = j.error && j.error.message;
+          resolve({ vectors: j.embeddings ? j.embeddings.map((e) => e.values) : null, err, retryAfterMs: retryAfterMs(j, err) });
         } catch { resolve({ err: 'embed response parse failed' }); }
       });
     });
     req.on('error', (e) => resolve({ err: e.message }));
     req.on('timeout', () => { req.destroy(); resolve({ err: `embed timeout ${timeoutMs}ms` }); });
     req.write(body); req.end();
-  });
+    });
+  }
+function retryAfterMs(response, message) {
+  const retryInfo = (response.error?.details || []).find(
+    (detail) => detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo');
+  const duration = retryInfo?.retryDelay;
+  const text = typeof duration === 'string' ? duration : String(message || '');
+  const match = text.match(/(?:retry in|retryDelay[^0-9]*)([0-9.]+)s/i);
+  if (!match) return null;
+  const milliseconds = Math.ceil(Number(match[1]) * 1000);
+  return Number.isFinite(milliseconds) && milliseconds > 0 ? milliseconds : null;
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function embedBatchWithRetry(texts, taskType, retryBudget) {
+  for (let attempt = 0; ; attempt++) {
+    const result = await embedBatch(texts, taskType);
+    if (result.vectors) return result;
+
+    const delay = result.retryAfterMs;
+    if (!delay || attempt >= MAX_EMBED_RETRIES) return result;
+    if (delay > MAX_RETRY_DELAY_MS || retryBudget.waitedMs + delay > MAX_RETRY_BUDGET_MS) {
+      return {
+        ...result,
+        err: `${result.err || 'embedding failed'} (retry deferred; requested ${delay}ms)`
+      };
+    }
+    console.warn(`[pmsEmbedding] rate limited; retry ${attempt + 1}/${MAX_EMBED_RETRIES} in ${delay}ms`);
+    await sleep(delay);
+    retryBudget.waitedMs += delay;
+  }
 }
 
 function toVectorLiteral(values) {
@@ -103,11 +145,12 @@ async function sync(docs) {
       wanted.add(key);
       if (current.get(key) !== d.contentHash) changed.push(d);
     }
+    const retryBudget = { waitedMs: 0 };
 
     let embedded = 0;
-    for (let i = 0; i < changed.length; i += BATCH_SIZE) {
-      const chunk = changed.slice(i, i + BATCH_SIZE);
-      const r = await embedBatch(chunk.map((d) => String(d.text)), 'RETRIEVAL_DOCUMENT');
+    for (let i = 0; i < changed.length; i += EMBED_BATCH_SIZE) {
+      const chunk = changed.slice(i, i + EMBED_BATCH_SIZE);
+      const r = await embedBatchWithRetry(chunk.map((d) => String(d.text)), 'RETRIEVAL_DOCUMENT', retryBudget);
       if (!r.vectors || r.vectors.length !== chunk.length) {
         return { err: `embed failed: ${r.err || 'vector count mismatch'}` };
       }
@@ -135,7 +178,7 @@ async function sync(docs) {
 
     return {
       embedded, skipped: wanted.size - changed.length, deleted, total: wanted.size,
-      elapsedMs: Date.now() - t0, model: EMBED_MODEL
+      elapsedMs: Date.now() - t0, retryWaitMs: retryBudget.waitedMs, model: EMBED_MODEL
     };
   } catch (e) {
     return { err: e.message };

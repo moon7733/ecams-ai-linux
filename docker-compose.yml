@@ -75,6 +75,10 @@ services:
       - PGDATABASE=${PGDATABASE:-postgres}
       - PGUSER=${PGUSER:-azbrain}
       - PGPASSWORD=${PGPASSWORD:-}
+      - PMS_EMBED_BATCH_SIZE=${PMS_EMBED_BATCH_SIZE:-20}
+      - PMS_EMBED_MAX_RETRIES=${PMS_EMBED_MAX_RETRIES:-3}
+      - PMS_EMBED_RETRY_MAX_DELAY_MS=${PMS_EMBED_RETRY_MAX_DELAY_MS:-30000}
+      - PMS_EMBED_RETRY_BUDGET_MS=${PMS_EMBED_RETRY_BUDGET_MS:-60000}
       # 분류 백엔드: hybrid(기본, API→agy 폴백) | api | agy
       - PMS_CLASSIFY_BACKEND=${PMS_CLASSIFY_BACKEND:-hybrid}
     restart: unless-stopped
