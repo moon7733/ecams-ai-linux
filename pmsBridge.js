@@ -11,9 +11,12 @@
  * POST /pms/wbs-vision        {imageBase64,mime}            -> {rows,notes,elapsedMs,model}
  * POST /pms/assistant-answer  {question,mode,citations}     -> {answer,followUps,elapsedMs,model}
  * GET  /pms/health                                        -> {ok:true}
+ * POST /pms/embed-sync        {docs[]}                      -> {embedded,skipped,deleted,total}
+ * POST /pms/semantic-search   {question,topK?}              -> {hits:[{sourceType,sourceId,score}]}
  */
 const http = require('http');
 const { classify, extractWbs, synthesizeAnswer, loadKey } = require('./pmsGemini');
+const { sync: syncEmbeddings, search: semanticSearch } = require('./pmsEmbedding');
 
 const PORT = Number(process.env.PMS_BRIDGE_PORT || 8790);
 const TOKEN = process.env.PMS_BRIDGE_TOKEN || '';
@@ -60,6 +63,16 @@ const server = http.createServer(async (req, res) => {
       if (!Array.isArray(body.citations) || body.citations.length === 0) return send(res, 400, { error: 'citations required' });
       const r = await synthesizeAnswer(body.question, body.citations, body.mode || 'CURRENT');
       return r.answer ? send(res, 200, r) : send(res, 502, { error: `answer synthesis failed: ${r.err}` });
+    }
+    if (url === '/pms/embed-sync') {
+      if (!Array.isArray(body.docs)) return send(res, 400, { error: 'docs array required' });
+      const r = await syncEmbeddings(body.docs);
+      return r.err ? send(res, 502, { error: `embedding sync failed: ${r.err}` }) : send(res, 200, r);
+    }
+    if (url === '/pms/semantic-search') {
+      if (!body.question || !body.question.trim()) return send(res, 400, { error: 'question required' });
+      const r = await semanticSearch(body.question, body.topK);
+      return r.err ? send(res, 502, { error: `semantic search failed: ${r.err}` }) : send(res, 200, r);
     }
     return send(res, 404, { error: 'not found' });
   } catch (e) {
