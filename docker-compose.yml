@@ -69,6 +69,12 @@ services:
       - PMS_BRIDGE_PORT=8790
       - PMS_BRIDGE_TOKEN=${PMS_BRIDGE_TOKEN:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # ?20.3 pgvector ??? ???. azbrain ?? DB ??? pms-bridge?? ????.
+      - PGHOST=${PGHOST:-192.168.0.21}
+      - PGPORT=${PGPORT:-5432}
+      - PGDATABASE=${PGDATABASE:-postgres}
+      - PGUSER=${PGUSER:-azbrain}
+      - PGPASSWORD=${PGPASSWORD:-}
       # 분류 백엔드: hybrid(기본, API→agy 폴백) | api | agy
       - PMS_CLASSIFY_BACKEND=${PMS_CLASSIFY_BACKEND:-hybrid}
     restart: unless-stopped
