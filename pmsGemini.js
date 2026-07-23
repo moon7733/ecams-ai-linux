@@ -123,6 +123,39 @@ async function extractWbs(imageBase64, mime = 'image/jpeg') {
   return { rows, notes: obj?.notes || [], elapsedMs: Date.now() - t0, model: VISION_MODEL, err: rows ? null : (res.err || 'no JSON') };
 }
 
+// ── FIND 생성형 답변 합성 (/pms/assistant-answer) ────────────────────────────
+// PMS가 권한 선필터·redaction을 마친 citation만 보낸다(비밀값은 원래 안 옴 — secret=true는
+// "비밀 값이 등록되어 있음" 고정 문자열). 실패 시 PMS가 extractive 답변으로 폴백하므로
+// agy 폴백은 안 쓴다(대화형 응답에 수십초 지연은 부적합).
+function answerInstruction(mode) {
+  return [
+    '당신은 사내 PMS 지식비서의 답변 합성기다. 아래 <QUESTION>에 대해 <CITATIONS>(권한 검증된 근거 목록)만 사용해 한국어로 답한다. JSON 객체로만 출력한다.',
+    '출력: {"answer": string, "followUps": [string, ...]}',
+    '- answer: 근거를 종합한 자연어 답변. 서술마다 근거 번호를 [1], [2] 형식으로 인용한다.',
+    '- ★근거 밖 사실 생성 금지(최우선·엄수): <CITATIONS>에 없는 이름·값·날짜·연락처·사실을 지어내지 마라. 질문에 대한 근거가 부족하면 아는 범위만 답하고 부족하다고 명시해라.',
+    '- [SECRET] 표시된 근거는 값이 감춰진 것이다("비밀 값이 등록되어 있음"). 값을 추측·창작하지 말고, 비밀 열람 기능으로 확인할 수 있다고만 안내해라.',
+    mode === 'HISTORY'
+      ? '- 이 질문은 변경 이력 조회다. 시간 순서를 살려 어떤 변경이 있었는지 요약해라.'
+      : '- 답변 끝에 근거 내용에서 자연히 이어지는 선제 제안 한 문장을 덧붙여라(함께 확인하면 좋은 항목 등, 근거에 실제로 있는 것만).',
+    '- followUps: 사용자가 이어서 물을 만한 짧은 후속 질문 2~3개(한국어).',
+    '오직 JSON 객체만.'
+  ].join('\n');
+}
+
+async function synthesizeAnswer(question, citations, mode = 'CURRENT') {
+  const lines = (citations || []).map((c) =>
+    `[${c.no}] (${c.sourceType || '?'}) ${c.breadcrumb || ''}${c.observedAt ? ` @${c.observedAt}` : ''}${c.secret ? ' [SECRET]' : ''}: ${c.excerpt || ''}`);
+  const prompt = `${answerInstruction(mode)}\n<QUESTION>\n${question}\n</QUESTION>\n<CITATIONS>\n${lines.join('\n')}\n</CITATIONS>`;
+  const t0 = Date.now();
+  const res = await withRetry(() => callGemini([{ text: prompt }], { model: TEXT_MODEL, maxOutputTokens: 2048, timeoutMs: 12000 }));
+  let obj = null;
+  if (res.text) { try { obj = JSON.parse(res.text); } catch { const m = res.text.match(/\{[\s\S]*\}/); if (m) try { obj = JSON.parse(m[0]); } catch {} } }
+  const answer = obj && typeof obj.answer === 'string' && obj.answer.trim() ? obj.answer.trim() : null;
+  const followUps = Array.isArray(obj && obj.followUps)
+    ? obj.followUps.filter((f) => typeof f === 'string' && f.trim()).slice(0, 3) : [];
+  return { answer, followUps, elapsedMs: Date.now() - t0, model: TEXT_MODEL, err: answer ? null : (res.err || 'no JSON answer') };
+}
+
 // ── agy(월정액 세션) 백엔드 — API 키 쿼터 초과 시 폴백용 ────────────────────
 // agy = Gemini 기반 에이전트 CLI. node-pty 로 print 모드 원샷 실행(server.js runAgyOnce 패턴).
 // 무료 API 키(분당 20회)와 달리 월정액이라 쿼터 넉넉. 대신 수초~수십초 + 가끔 재시도.
@@ -194,5 +227,5 @@ function classify(text, knownTags = []) {
 
 module.exports = {
   loadKey, callGemini, classifyText, classifyTextAgy, classifyHybrid, classify,
-  isQuota, extractWbs, TEXT_MODEL, VISION_MODEL, AGY_EXE
+  isQuota, extractWbs, synthesizeAnswer, TEXT_MODEL, VISION_MODEL, AGY_EXE
 };

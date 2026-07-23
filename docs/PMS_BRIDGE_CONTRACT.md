@@ -47,6 +47,25 @@ notes = 우측 협조요청/비고 등 특정 행에 안 묶이는 프로젝트 
 - 실측: 4000×3000 모니터 사진 → **29행 정확 추출 + 협조사항 7건 분리, ~7s**(flash-lite).
 - 정확도 부족한 사진은 `PMS_VISION_MODEL=gemini-2.5-flash`로 올림(느려짐).
 
+### POST /pms/assistant-answer  — FIND 생성형 답변 합성 (2026-07-23, 갭 리뷰 §20.2)
+요청: `{ "question": "...", "mode": "CURRENT"|"HISTORY", "citations": [ Citation ] }`
+응답: `{ "answer": "...", "followUps": ["...", ...], "elapsedMs": 1500, "model": "gemini-2.5-flash" }`
+```
+Citation = {
+  no:         number,           // 근거 번호(1부터) — answer가 [1], [2]로 인용
+  sourceType: string,           // KNOWLEDGE_ITEM | PROJECT | CUSTOMER | ...
+  breadcrumb: string,           // 표시 경로 (예: "프로젝트/12/지식/7")
+  excerpt:    string,           // redacted INTERNAL 발췌. secret=true면 "비밀 값이 등록되어 있음" 고정 문자열
+  observedAt: "YYYY-MM-DD" | null,
+  secret:     boolean
+}
+```
+- **PMS가 권한 선필터 + redaction을 마친 citation만 보낸다**(비밀값 전송 금지 — 브릿지는 받은 걸 그대로 Gemini로 보냄).
+- 프롬프트가 citation 밖 사실 생성 금지·근거 번호 인용을 강제. [SECRET] 근거는 값 추측 금지, 열람 절차 안내만.
+- citations가 비면 400 — 근거 없는 합성은 하지 않는다(PMS extractive '근거 없음' 유지).
+- **agy 폴백 없음**(분류와 다름): 대화형 응답에 수십초 지연은 부적합. 실패(502)면 PMS가 extractive 답변으로 폴백.
+- 모델 gemini-2.5-flash, 타임아웃 12s(브릿지 내부) / 15s(PMS `pms.ai.bridge.answer-timeout-ms`).
+
 ### 에러
 `{ "error": "..." }` + 상태코드: 400(요청불량) / 401(토큰) / 502(Gemini 실패) / 500(내부).
 

@@ -7,12 +7,13 @@
  * 기동: PMS_BRIDGE_TOKEN=<서비스토큰> PMS_BRIDGE_PORT=8790 node pmsBridge.js
  * 인증: 모든 요청에 헤더 X-PMS-Token 필요(PMS_BRIDGE_TOKEN 미설정 시 경고 후 무인증=개발용).
  *
- * POST /pms/classify     {text}                  -> {items,elapsedMs,model}
- * POST /pms/wbs-vision    {imageBase64,mime}       -> {rows,notes,elapsedMs,model}
- * GET  /pms/health                               -> {ok:true}
+ * POST /pms/classify         {text}                       -> {items,elapsedMs,model}
+ * POST /pms/wbs-vision        {imageBase64,mime}            -> {rows,notes,elapsedMs,model}
+ * POST /pms/assistant-answer  {question,mode,citations}     -> {answer,followUps,elapsedMs,model}
+ * GET  /pms/health                                        -> {ok:true}
  */
 const http = require('http');
-const { classify, extractWbs, loadKey } = require('./pmsGemini');
+const { classify, extractWbs, synthesizeAnswer, loadKey } = require('./pmsGemini');
 
 const PORT = Number(process.env.PMS_BRIDGE_PORT || 8790);
 const TOKEN = process.env.PMS_BRIDGE_TOKEN || '';
@@ -53,6 +54,12 @@ const server = http.createServer(async (req, res) => {
       if (!body.imageBase64) return send(res, 400, { error: 'imageBase64 required' });
       const r = await extractWbs(body.imageBase64, body.mime || 'image/jpeg');
       return r.rows ? send(res, 200, r) : send(res, 502, { error: `wbs extract failed: ${r.err}` });
+    }
+    if (url === '/pms/assistant-answer') {
+      if (!body.question || !body.question.trim()) return send(res, 400, { error: 'question required' });
+      if (!Array.isArray(body.citations) || body.citations.length === 0) return send(res, 400, { error: 'citations required' });
+      const r = await synthesizeAnswer(body.question, body.citations, body.mode || 'CURRENT');
+      return r.answer ? send(res, 200, r) : send(res, 502, { error: `answer synthesis failed: ${r.err}` });
     }
     return send(res, 404, { error: 'not found' });
   } catch (e) {
