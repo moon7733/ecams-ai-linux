@@ -68,6 +68,86 @@ const COMMON_CATEGORIES = [
   '접속 정보', '운영 절차', '배포 절차', '방화벽·네트워크', '형상관리', '서버·인프라',
   '일정·회의', '이슈·장애', '요구사항', '특이사항', '인수인계'
 ];
+// 지식 좌표 모드에서 쓰는 고정 어휘. PMS가 판정을 다시 하므로(CapturePredicateGate) 여기 값은 "제안"이다.
+const KINDS = ['FIELD', 'NOTE', 'PROCEDURE'];
+const ROUTES = ['KNOWLEDGE_FACT', 'WORK_RECORD', 'ISSUE_TASK', 'DOMAIN_CANON', 'DISCARD_VIEW'];
+
+/**
+ * 좌표 모드 지시문 — PMS가 아웃라인 노드(nodePath)와 predicate 어휘를 함께 보낼 때 쓴다.
+ * 노드 하나에서 사실이 여러 개 나오면 같은 nodePath로 여러 항목을 낸다(PMS가 노드당 다항목을 받는다).
+ */
+function outlineInstruction(nodes, predicates, cats) {
+  const paths = nodes.map((n) => `"${n.nodePath}"`).join(', ');
+  const vocab = predicates.map((p) => {
+    const q = (p.qualifierKeys || []).length ? ` qualifiers=[${p.qualifierKeys.join(',')}]` : '';
+    return `  ${p.code}  (${p.name || ''}${p.valueType ? `, ${p.valueType}` : ''})${q}`;
+  }).join('\n');
+  return [
+    '당신은 SI 프로젝트 인수인계 메모의 지식 좌표 분류기다. <NODES>의 각 노드를 읽고 사실 단위로 JSON 배열만 출력한다.',
+    '각 원소: {"nodePath","kind","predicate","qualifiers","target","key","category","title","body","tag","route","sensitive"}',
+    '',
+    '■ nodePath (필수)',
+    `- 반드시 다음 좌표 중 하나를 문자열 그대로 쓴다: ${paths}`,
+    '- 대괄호·따옴표·기호를 덧붙이지 마라. 좌표가 "1"이면 nodePath는 "1"이다("[1]" 아님).',
+    '- 없는 좌표를 만들지 마라. 좌표가 틀린 항목은 PMS가 버린다.',
+    '- 한 노드에 사실이 여러 개면 **같은 nodePath로 항목을 여러 개** 내라. 그게 정상이다.',
+    '- 노드의 모든 내용이 어느 항목에든 담겨야 한다. 빠뜨린 내용은 그대로 유실된다.',
+    '',
+    '■ kind (필수)',
+    `- 반드시 ${KINDS.join(' | ')} 중 하나. route 값(ISSUE_TASK 등)을 kind에 넣지 마라 — 별개 필드다.`,
+    '- FIELD: "무엇 = 값" 하나로 떨어지는 사실. **아래 어휘에 맞는 코드가 있으면 적극적으로 FIELD로 잡아라.**',
+    '  예: "항군회관 5층" → SITE.ADDRESS / "아이디 lym7733" → ACCESS.USERNAME',
+    '      "위키 > 인프라 > 형상관리" → DOCUMENT.LOCATION / "리눅스 레드햇 8.10" → 서버 OS 값',
+    '  예외 하나: 라벨만 있고 값이 원문에 없으면(예: "프로젝트뷰 (웹사이트)" — URL이 안 적혀 있다)'
+      + ' 값을 지어내지 말고 그 항목만 NOTE로 둔다.',
+    '- PROCEDURE: 순서가 있는 절차(1단계·2단계, 체크아웃→배포 같은 흐름).',
+    '- NOTE: 위 둘이 아닌 서술.',
+    '',
+    '■ predicate (FIELD일 때만, 아래 목록에서만)',
+    vocab || '  (등록된 어휘 없음 — predicate는 null)',
+    '- 목록에 맞는 코드가 없으면 predicate=null, kind="NOTE"로 둔다. **코드를 새로 만들지 마라.**',
+    '- qualifiers: 그 코드에 표시된 키만 쓴다. 예: ACCESS.CREDENTIAL + {"asset":"LAPTOP"}.',
+    '  같은 predicate가 대상별로 여러 번 나오면 qualifiers로 구분한다(노트북 비번 / 망관리 비번).',
+    '  해당 키가 없으면 qualifiers={}.',
+    '',
+    '■ route (필수) — 이 내용이 지식인지 다른 곳으로 갈 것인지',
+    `- ${ROUTES.join(' | ')}`,
+    '- KNOWLEDGE_FACT: 계속 참조할 사실(기본값).',
+    '- WORK_RECORD: 날짜별로 "무엇을 했다"는 작업 기록.',
+    '- ISSUE_TASK: 아직 안 된 일·요청·미결(예: "문서 작성 필요", "설명 필요").',
+    '- DOMAIN_CANON: 고객사·계약·인스턴스 정본 화면이 따로 관리하는 값(OS·계약기간·점검주기 등).',
+    '- DISCARD_VIEW: 화면이 자동 집계할 수 있어 저장할 필요 없는 것.',
+    '',
+    '■ sensitive',
+    '- 비밀번호·키처럼 값 자체가 비밀이면 true. (비밀 줄은 이미 걸러져 올 수 있다 — 없으면 false.)',
+    '',
+    '■ 그 밖의 필드 — 기존 규칙 그대로',
+    ...legacyFieldRules(cats),
+    '오직 JSON 배열만.'
+  ].join('\n');
+}
+
+/** target/key/category/tag/body 규칙 — 좌표 모드와 레거시 모드가 공유한다. */
+function legacyFieldRules(cats) {
+  return [
+    '- target: "info" | "knowledge" | "credential".',
+    '- "info": 값이 아래 정형 필드에 해당할 때(문장 속에 값이 있으면 값만 뽑아 body에). key는 "DB","WAS","SCM","SERVER_IP","LOGIN_STEPS" 중 하나.',
+    '- "credential": 비밀번호 등 민감정보. tag="접속 정보".',
+    '- 그 외는 "knowledge". key=null, title=짧고 명확한 제목.',
+    '- category: 반드시 다음 6개 코드 중 하나(대문자 코드로만):',
+    '    ACCESS   = 접속·환경 / OPERATION= 운영·배포 / PROCESS  = 프로세스·지식',
+    '    CONTACT  = 담당·연락 / ISSUE    = 이슈·리스크 / ETC      = 기타',
+    '  판단은 값이 아니라 **의미**로 한다.',
+    '- tag: category보다 더 구체적인 소분류 라벨. 기존 목록에 맞으면 재사용, 없으면 새로:',
+    `    [${cats.join(', ')}]`,
+    '  "메모","기타","정보" 같은 막연한 태그 금지.',
+    '- body: 원문을 읽기 좋게 다듬는다(문장·순서 정돈, 군더더기 제거). info는 값만 뽑는다.',
+    '- ★★사실 보존(최우선·엄수): 회사명·기관명·시스템명·사람이름·직급·날짜·시각·전화번호·계정·경로·IP·수치 등'
+      + ' **모든 고유명사와 값은 입력에 있는 글자 그대로** 유지하라. 표현만 다듬고 사실은 건드리지 마라.',
+    '  절대 금지: 입력에 없는 고유명사·사실을 지어내거나, 있는 것을 비슷한 다른 것으로 치환.'
+  ];
+}
+
 function classifyInstruction(knownTags = []) {
   const cats = Array.from(new Set([...(knownTags || []), ...COMMON_CATEGORIES]));
   return [
@@ -98,11 +178,56 @@ function classifyInstruction(knownTags = []) {
   ].join('\n');
 }
 
-async function classifyText(text, knownTags = []) {
-  const prompt = `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`;
+/**
+ * 프롬프트 조립. opts.nodes(아웃라인 좌표)가 있으면 좌표 모드, 없으면 기존 <DUMP> 모드다.
+ * 좌표 모드는 어휘 목록 + 노드당 다항목이라 출력이 길어져 토큰 상한을 넉넉히 준다.
+ */
+function buildClassifyPrompt(text, knownTags = [], opts = {}) {
+  const cats = Array.from(new Set([...(knownTags || []), ...COMMON_CATEGORIES]));
+  const nodes = Array.isArray(opts.nodes) ? opts.nodes.filter((n) => n && n.nodePath && n.text) : [];
+  if (!nodes.length) {
+    return { prompt: `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`, maxOutputTokens: 2048, nodes };
+  }
+  const predicates = Array.isArray(opts.predicates) ? opts.predicates.filter((p) => p && p.code) : [];
+  const rendered = nodes.map((n) =>
+    `[${n.nodePath}]${n.heading ? ` ${n.heading}` : ''}\n${n.text}`).join('\n\n');
+  return {
+    prompt: `${outlineInstruction(nodes, predicates, cats)}\n<NODES>\n${rendered}\n</NODES>`,
+    maxOutputTokens: Number(process.env.PMS_CLASSIFY_MAX_TOKENS || 8192),
+    nodes
+  };
+}
+
+/**
+ * nodePath 정돈. 모델이 "[1]"·"'1'"처럼 기호를 덧붙이는 일이 실제로 있었다 —
+ * 좌표가 틀리면 PMS가 그 노드를 통짜로 저장해 분할이 무의미해지므로 여기서 되돌린다.
+ * 그래도 모르는 좌표인데 노드가 하나뿐이면 그 노드로 본다(달리 갈 곳이 없다).
+ */
+function normalizeNodePaths(items, nodes) {
+  if (!Array.isArray(items) || !nodes.length) return items;
+  const known = new Set(nodes.map((n) => String(n.nodePath)));
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    let p = it.nodePath == null ? '' : String(it.nodePath).trim().replace(/^[[("'`]+|[\])"'`]+$/g, '').trim();
+    if (!known.has(p)) p = nodes.length === 1 ? String(nodes[0].nodePath) : p;
+    it.nodePath = p;
+    // kind 칸에 route 값을 넣는 혼동이 실제로 있었다. PMS도 모르는 kind는 NOTE로 떨구지만 여기서 먼저 맞춘다.
+    const kind = it.kind == null ? '' : String(it.kind).trim().toUpperCase();
+    it.kind = KINDS.includes(kind) ? kind : 'NOTE';
+    if (it.kind !== 'FIELD') it.predicate = null;
+    const route = it.route == null ? '' : String(it.route).trim().toUpperCase();
+    it.route = ROUTES.includes(route) ? route : null;
+  }
+  return items;
+}
+
+async function classifyText(text, knownTags = [], opts = {}) {
+  const { prompt, maxOutputTokens, nodes } = buildClassifyPrompt(text, knownTags, opts);
   const t0 = Date.now();
-  const res = await withRetry(() => callGemini([{ text: prompt }], { model: TEXT_MODEL, maxOutputTokens: 2048, timeoutMs: 15000 }));
-  const items = parseArray(res.text);
+  const res = await withRetry(() => callGemini([{ text: prompt }], {
+    model: TEXT_MODEL, maxOutputTokens, timeoutMs: Number(process.env.PMS_CLASSIFY_TIMEOUT_MS || 15000)
+  }));
+  const items = normalizeNodePaths(parseArray(res.text), nodes);
   return { items, elapsedMs: Date.now() - t0, model: TEXT_MODEL, err: items ? null : (res.err || 'no JSON array') };
 }
 
@@ -193,14 +318,14 @@ function runAgyPrint(prompt, timeoutMs = 90000) {
   });
 }
 
-async function classifyTextAgy(text, knownTags = []) {
-  const prompt = `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`;
+async function classifyTextAgy(text, knownTags = [], opts = {}) {
+  const { prompt, nodes } = buildClassifyPrompt(text, knownTags, opts);
   const t0 = Date.now();
   let items = null, err = null;
   for (let attempt = 0; attempt < 2 && !items; attempt++) {   // agy 비결정성 대비 1회 재시도
     const r = await runAgyPrint(prompt);
     if (r.err && !r.raw) { err = r.err; continue; }
-    items = parseArray(cleanAnsi(r.raw));
+    items = normalizeNodePaths(parseArray(cleanAnsi(r.raw)), nodes);
     if (!items) err = r.err || 'agy: JSON 배열 없음';
   }
   return { items, elapsedMs: Date.now() - t0, model: 'agy', err: items ? null : err };
@@ -209,23 +334,23 @@ async function classifyTextAgy(text, knownTags = []) {
 function isQuota(err) { return /RESOURCE_EXHAUSTED|quota|rate.?limit|\b429\b/i.test(err || ''); }
 
 // 하이브리드: API 키 먼저(빠름), 실패(특히 쿼터)면 agy 로 폴백.
-async function classifyHybrid(text, knownTags = []) {
-  const api = await classifyText(text, knownTags);
+async function classifyHybrid(text, knownTags = [], opts = {}) {
+  const api = await classifyText(text, knownTags, opts);
   if (api.items) return api;
-  const agy = await classifyTextAgy(text, knownTags);
+  const agy = await classifyTextAgy(text, knownTags, opts);
   if (agy.items) return { items: agy.items, elapsedMs: agy.elapsedMs, model: 'agy(fallback)', err: null, apiErr: api.err };
   return { items: null, elapsedMs: (api.elapsedMs || 0) + (agy.elapsedMs || 0), model: 'api+agy', err: `api:${api.err} | agy:${agy.err}` };
 }
 
 // 백엔드 선택: PMS_CLASSIFY_BACKEND = hybrid(기본) | api | agy
-function classify(text, knownTags = []) {
+function classify(text, knownTags = [], opts = {}) {
   const backend = (process.env.PMS_CLASSIFY_BACKEND || 'hybrid').toLowerCase();
-  if (backend === 'api') return classifyText(text, knownTags);
-  if (backend === 'agy') return classifyTextAgy(text, knownTags);
-  return classifyHybrid(text, knownTags);
+  if (backend === 'api') return classifyText(text, knownTags, opts);
+  if (backend === 'agy') return classifyTextAgy(text, knownTags, opts);
+  return classifyHybrid(text, knownTags, opts);
 }
 
 module.exports = {
-  loadKey, callGemini, classifyText, classifyTextAgy, classifyHybrid, classify,
+  loadKey, callGemini, buildClassifyPrompt, classifyText, classifyTextAgy, classifyHybrid, classify,
   isQuota, extractWbs, synthesizeAnswer, TEXT_MODEL, VISION_MODEL, AGY_EXE
 };

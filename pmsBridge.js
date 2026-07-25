@@ -7,7 +7,9 @@
  * 기동: PMS_BRIDGE_TOKEN=<서비스토큰> PMS_BRIDGE_PORT=8790 node pmsBridge.js
  * 인증: 모든 요청에 헤더 X-PMS-Token 필요(PMS_BRIDGE_TOKEN 미설정 시 경고 후 무인증=개발용).
  *
- * POST /pms/classify         {text}                       -> {items,elapsedMs,model}
+ * POST /pms/classify         {text} 또는 {nodes[],predicates[]} -> {items,elapsedMs,model}
+ *   - nodes: [{nodePath,heading,text}] 아웃라인 좌표. 주면 좌표 모드(항목마다 nodePath·kind·predicate·route 반환).
+ *   - predicates: [{code,name,valueType,qualifierKeys[]}] PMS 어휘 정본. 좌표 모드에서만 쓴다.
  * POST /pms/wbs-vision        {imageBase64,mime}            -> {rows,notes,elapsedMs,model}
  * POST /pms/assistant-answer  {question,mode,citations}     -> {answer,followUps,elapsedMs,model}
  * GET  /pms/health                                        -> {ok:true}
@@ -49,8 +51,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (url === '/pms/classify') {
-      if (!body.text || !body.text.trim()) return send(res, 400, { error: 'text required' });
-      const r = await classify(body.text, Array.isArray(body.knownTags) ? body.knownTags : []);
+      // nodes(아웃라인 좌표)가 오면 좌표 모드 — text 없이도 된다. 없으면 기존 text 모드(레거시 /assistant 경로).
+      const nodes = Array.isArray(body.nodes) ? body.nodes : [];
+      if (!nodes.length && (!body.text || !body.text.trim())) return send(res, 400, { error: 'text or nodes required' });
+      const r = await classify(body.text || '', Array.isArray(body.knownTags) ? body.knownTags : [],
+        { nodes, predicates: Array.isArray(body.predicates) ? body.predicates : [] });
       return r.items ? send(res, 200, r) : send(res, 502, { error: `classify failed: ${r.err}` });
     }
     if (url === '/pms/wbs-vision') {
