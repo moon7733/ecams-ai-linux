@@ -186,7 +186,12 @@ function buildClassifyPrompt(text, knownTags = [], opts = {}) {
   const cats = Array.from(new Set([...(knownTags || []), ...COMMON_CATEGORIES]));
   const nodes = Array.isArray(opts.nodes) ? opts.nodes.filter((n) => n && n.nodePath && n.text) : [];
   if (!nodes.length) {
-    return { prompt: `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`, maxOutputTokens: 2048, nodes };
+    return {
+      prompt: `${classifyInstruction(knownTags)}\n<DUMP>\n${text}\n</DUMP>`,
+      maxOutputTokens: 2048,
+      timeoutMs: Number(process.env.PMS_CLASSIFY_TIMEOUT_MS || 15000),
+      nodes
+    };
   }
   const predicates = Array.isArray(opts.predicates) ? opts.predicates.filter((p) => p && p.code) : [];
   const rendered = nodes.map((n) =>
@@ -194,6 +199,8 @@ function buildClassifyPrompt(text, knownTags = [], opts = {}) {
   return {
     prompt: `${outlineInstruction(nodes, predicates, cats)}\n<NODES>\n${rendered}\n</NODES>`,
     maxOutputTokens: Number(process.env.PMS_CLASSIFY_MAX_TOKENS || 8192),
+    // 좌표 모드는 어휘 44개 + 노드별 다항목이라 출력이 길다. 실메모에서 15초로는 끊긴다.
+    timeoutMs: Number(process.env.PMS_CLASSIFY_OUTLINE_TIMEOUT_MS || 40000),
     nodes
   };
 }
@@ -222,10 +229,10 @@ function normalizeNodePaths(items, nodes) {
 }
 
 async function classifyText(text, knownTags = [], opts = {}) {
-  const { prompt, maxOutputTokens, nodes } = buildClassifyPrompt(text, knownTags, opts);
+  const { prompt, maxOutputTokens, timeoutMs, nodes } = buildClassifyPrompt(text, knownTags, opts);
   const t0 = Date.now();
   const res = await withRetry(() => callGemini([{ text: prompt }], {
-    model: TEXT_MODEL, maxOutputTokens, timeoutMs: Number(process.env.PMS_CLASSIFY_TIMEOUT_MS || 15000)
+    model: TEXT_MODEL, maxOutputTokens, timeoutMs
   }));
   const items = normalizeNodePaths(parseArray(res.text), nodes);
   return { items, elapsedMs: Date.now() - t0, model: TEXT_MODEL, err: items ? null : (res.err || 'no JSON array') };
