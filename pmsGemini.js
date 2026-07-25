@@ -46,11 +46,34 @@ function callGemini(parts, { model, maxOutputTokens = 2048, timeoutMs = 30000 })
   });
 }
 
-function parseArray(text) {
+function parseJson(text) {
   if (!text) return null;
-  let j; try { j = JSON.parse(text); } catch { const m = text.match(/\[[\s\S]*\]/); if (!m) return null; try { j = JSON.parse(m[0]); } catch { return null; } }
+  try { return JSON.parse(text); } catch {}
+  // 객체 우선 — 좌표 모드는 {"items":[...],"clarify":[...]}를 낸다. 배열만 온 응답도 계속 받는다.
+  for (const re of [/\{[\s\S]*\}/, /\[[\s\S]*\]/]) {
+    const m = text.match(re);
+    if (m) { try { return JSON.parse(m[0]); } catch {} }
+  }
+  return null;
+}
+
+function parseArray(text) {
+  const j = parseJson(text);
+  if (!j) return null;
   if (Array.isArray(j)) return j;
   return j.items || j.rows || j.results || null;
+}
+
+/** 좌표 모드 응답 = 항목 + 되묻기. 구버전 모델이 배열만 내도 clarify는 빈 배열로 받는다. */
+function parsePayload(text) {
+  const j = parseJson(text);
+  if (!j) return { items: null, clarify: [] };
+  if (Array.isArray(j)) return { items: j, clarify: [] };
+  const clarify = Array.isArray(j.clarify)
+    ? j.clarify.map((c) => (typeof c === 'string' ? c : c && c.question))
+        .filter((c) => typeof c === 'string' && c.trim()).map((c) => c.trim()).slice(0, 3)
+    : [];
+  return { items: j.items || j.rows || j.results || null, clarify };
 }
 
 async function withRetry(fn) {
@@ -83,8 +106,9 @@ function outlineInstruction(nodes, predicates, cats) {
     return `  ${p.code}  (${p.name || ''}${p.valueType ? `, ${p.valueType}` : ''})${q}`;
   }).join('\n');
   return [
-    '당신은 SI 프로젝트 인수인계 메모의 지식 좌표 분류기다. <NODES>의 각 노드를 읽고 사실 단위로 JSON 배열만 출력한다.',
-    '각 원소: {"nodePath","kind","predicate","qualifiers","target","key","category","title","body","tag","route","sensitive"}',
+    '당신은 SI 프로젝트 인수인계 메모의 지식 좌표 분류기다. <NODES>의 각 노드를 읽고 사실 단위로 분류한다.',
+    '출력은 JSON 객체 하나: {"items":[...],"clarify":[...]}',
+    '각 item: {"nodePath","kind","predicate","qualifiers","target","key","category","title","body","tag","route","sensitive","warning"}',
     '',
     '■ nodePath (필수)',
     `- 반드시 다음 좌표 중 하나를 문자열 그대로 쓴다: ${paths}`,
@@ -118,12 +142,38 @@ function outlineInstruction(nodes, predicates, cats) {
     '- DOMAIN_CANON: 고객사·계약·인스턴스 정본 화면이 따로 관리하는 값(OS·계약기간·점검주기 등).',
     '- DISCARD_VIEW: 화면이 자동 집계할 수 있어 저장할 필요 없는 것.',
     '',
+    '■ «SECRET#n» — 가려진 비밀 값 (가장 중요)',
+    '- 원문의 비밀 값은 PMS가 «SECRET#1» 같은 토큰으로 바꿔 보낸다. 라벨("노트북 패스워드")은 그대로 있다.',
+    '- 그 토큰을 **글자 그대로 body에 옮겨 적어라.** 지우거나 바꿔 쓰면 PMS가 그 비밀을 어느 사실에 붙일지 잃는다.',
+    '- 토큰이 든 사실은 라벨을 보고 좌표를 붙여라. 예:',
+    '    "노트북 패스워드 «SECRET#1»" → kind="FIELD", predicate="ACCESS.CREDENTIAL",',
+    '     qualifiers={"asset":"LAPTOP"}, title="노트북 로그인 비밀번호", body="노트북 패스워드 «SECRET#1»"',
+    '- 값을 추측해 쓰지 마라. 토큰이 곧 값이다.',
+    '- 무엇의 비밀인지 라벨로도 알 수 없으면 qualifiers는 비우고 clarify에 질문을 넣어라.',
+    '',
     '■ sensitive',
-    '- 비밀번호·키처럼 값 자체가 비밀이면 true. (비밀 줄은 이미 걸러져 올 수 있다 — 없으면 false.)',
+    '- 비밀번호·키처럼 값 자체가 비밀이면 true(«SECRET#n»이 들어간 항목이 여기 해당).',
+    '',
+    '■ title은 body의 복사본이 아니다',
+    '- title: 목록에서 이 사실을 식별할 짧은 이름(대개 10~20자). body 문장을 그대로 넣지 마라.',
+    '- body: 내용 본문. title과 같은 문자열이면 잘못된 것이다.',
+    '',
+    '■ 묶기와 나누기',
+    '- 이어진 하나의 서술(예: SVN 배포 흐름 전체)은 한 항목으로 묶어라.',
+    '- 단, "나중에는 ~로 바꿀 예정" 같은 **계획·예정**은 현재 사실과 나눠 별도 항목으로 내라.',
+    '',
+    '■ warning (선택)',
+    '- 그 사실이 오래 못 갈 위험을 한 문장으로. 예: "성현씨 부재 시 출입 불가 — 사람 의존".',
+    '- 위험이 없으면 넣지 마라. 값·비밀은 절대 담지 마라.',
+    '',
+    '■ clarify (선택) — 사람에게 되묻기',
+    '- 분류를 확신할 수 없을 때 추측하지 말고 질문 문장을 clarify 배열에 넣어라(최대 3개).',
+    '- 예: "MASTER / ecamssh는 계정/비밀번호 쌍인가요?", "이 비밀번호는 어느 시스템 것인가요?"',
+    '- 되물을 게 없으면 clarify는 빈 배열.',
     '',
     '■ 그 밖의 필드 — 기존 규칙 그대로',
     ...legacyFieldRules(cats),
-    '오직 JSON 배열만.'
+    '오직 JSON 객체만.'
   ].join('\n');
 }
 
@@ -224,6 +274,9 @@ function normalizeNodePaths(items, nodes) {
     if (it.kind !== 'FIELD') it.predicate = null;
     const route = it.route == null ? '' : String(it.route).trim().toUpperCase();
     it.route = ROUTES.includes(route) ? route : null;
+    // 품질 경고는 표시 전용이라 길이만 자른다. 객체·배열로 오면 버린다(PMS가 문자열만 받는다).
+    it.warning = typeof it.warning === 'string' && it.warning.trim()
+      ? it.warning.trim().slice(0, 200) : null;
   }
   return items;
 }
@@ -234,8 +287,12 @@ async function classifyText(text, knownTags = [], opts = {}) {
   const res = await withRetry(() => callGemini([{ text: prompt }], {
     model: TEXT_MODEL, maxOutputTokens, timeoutMs
   }));
-  const items = normalizeNodePaths(parseArray(res.text), nodes);
-  return { items, elapsedMs: Date.now() - t0, model: TEXT_MODEL, err: items ? null : (res.err || 'no JSON array') };
+  const parsed = parsePayload(res.text);
+  const items = normalizeNodePaths(parsed.items, nodes);
+  return {
+    items, clarify: parsed.clarify, elapsedMs: Date.now() - t0, model: TEXT_MODEL,
+    err: items ? null : (res.err || 'no JSON array')
+  };
 }
 
 const WBS_INSTRUCTION = [
@@ -328,14 +385,16 @@ function runAgyPrint(prompt, timeoutMs = 90000) {
 async function classifyTextAgy(text, knownTags = [], opts = {}) {
   const { prompt, nodes } = buildClassifyPrompt(text, knownTags, opts);
   const t0 = Date.now();
-  let items = null, err = null;
+  let items = null, clarify = [], err = null;
   for (let attempt = 0; attempt < 2 && !items; attempt++) {   // agy 비결정성 대비 1회 재시도
     const r = await runAgyPrint(prompt);
     if (r.err && !r.raw) { err = r.err; continue; }
-    items = normalizeNodePaths(parseArray(cleanAnsi(r.raw)), nodes);
+    const parsed = parsePayload(cleanAnsi(r.raw));
+    items = normalizeNodePaths(parsed.items, nodes);
+    clarify = parsed.clarify;
     if (!items) err = r.err || 'agy: JSON 배열 없음';
   }
-  return { items, elapsedMs: Date.now() - t0, model: 'agy', err: items ? null : err };
+  return { items, clarify, elapsedMs: Date.now() - t0, model: 'agy', err: items ? null : err };
 }
 
 function isQuota(err) { return /RESOURCE_EXHAUSTED|quota|rate.?limit|\b429\b/i.test(err || ''); }
@@ -345,7 +404,12 @@ async function classifyHybrid(text, knownTags = [], opts = {}) {
   const api = await classifyText(text, knownTags, opts);
   if (api.items) return api;
   const agy = await classifyTextAgy(text, knownTags, opts);
-  if (agy.items) return { items: agy.items, elapsedMs: agy.elapsedMs, model: 'agy(fallback)', err: null, apiErr: api.err };
+  if (agy.items) {
+    return {
+      items: agy.items, clarify: agy.clarify, elapsedMs: agy.elapsedMs,
+      model: 'agy(fallback)', err: null, apiErr: api.err
+    };
+  }
   return { items: null, elapsedMs: (api.elapsedMs || 0) + (agy.elapsedMs || 0), model: 'api+agy', err: `api:${api.err} | agy:${agy.err}` };
 }
 
@@ -358,6 +422,6 @@ function classify(text, knownTags = [], opts = {}) {
 }
 
 module.exports = {
-  loadKey, callGemini, buildClassifyPrompt, classifyText, classifyTextAgy, classifyHybrid, classify,
+  loadKey, callGemini, buildClassifyPrompt, parsePayload, classifyText, classifyTextAgy, classifyHybrid, classify,
   isQuota, extractWbs, synthesizeAnswer, TEXT_MODEL, VISION_MODEL, AGY_EXE
 };

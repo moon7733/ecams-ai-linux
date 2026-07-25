@@ -7,9 +7,11 @@
  * 기동: PMS_BRIDGE_TOKEN=<서비스토큰> PMS_BRIDGE_PORT=8790 node pmsBridge.js
  * 인증: 모든 요청에 헤더 X-PMS-Token 필요(PMS_BRIDGE_TOKEN 미설정 시 경고 후 무인증=개발용).
  *
- * POST /pms/classify         {text} 또는 {nodes[],predicates[]} -> {items,elapsedMs,model}
+ * POST /pms/classify         {text} 또는 {nodes[],predicates[]} -> {items,clarify,elapsedMs,model}
  *   - nodes: [{nodePath,heading,text}] 아웃라인 좌표. 주면 좌표 모드(항목마다 nodePath·kind·predicate·route 반환).
  *   - predicates: [{code,name,valueType,qualifierKeys[]}] PMS 어휘 정본. 좌표 모드에서만 쓴다.
+ *   - clarify: 모델이 사람에게 되묻는 문장(최대 3). 구버전 PMS는 이 필드를 무시하므로 추가해도 안전하다.
+ *   - 값이 가려진 자리에는 «SECRET#n» 토큰이 오고, 모델은 그 토큰을 body에 그대로 되돌려준다(PMS가 값과 다시 잇는다).
  * POST /pms/wbs-vision        {imageBase64,mime}            -> {rows,notes,elapsedMs,model}
  * POST /pms/assistant-answer  {question,mode,citations}     -> {answer,followUps,elapsedMs,model}
  * GET  /pms/health                                        -> {ok:true}
