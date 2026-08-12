@@ -17,10 +17,12 @@
  * GET  /pms/health                                        -> {ok:true}
  * POST /pms/embed-sync        {docs[]}                      -> {embedded,skipped,deleted,total}
  * POST /pms/semantic-search   {question,topK?}              -> {hits:[{sourceType,sourceId,score}]}
+ * POST /pms/code-search       {repo?,customer?,q,kind?,topK?} -> [{entityId,kind,name,paths,score}]
  */
 const http = require('http');
 const { classify, extractWbs, synthesizeAnswer, loadKey } = require('./pmsGemini');
 const { sync: syncEmbeddings, search: semanticSearch } = require('./pmsEmbedding');
+const { searchCode } = require('./pmsCodeSearch');
 
 const PORT = Number(process.env.PMS_BRIDGE_PORT || 8790);
 const TOKEN = process.env.PMS_BRIDGE_TOKEN || '';
@@ -80,6 +82,13 @@ const server = http.createServer(async (req, res) => {
       if (!body.question || !body.question.trim()) return send(res, 400, { error: 'question required' });
       const r = await semanticSearch(body.question, body.topK);
       return r.err ? send(res, 502, { error: `semantic search failed: ${r.err}` }) : send(res, 200, r);
+    }
+    if (url === '/pms/code-search') {
+      const q = typeof body.q === 'string' ? body.q.trim() : '';
+      if (Array.from(q).length < 2) return send(res, 400, { error: 'q must be at least 2 characters' });
+      if (!body.repo && !body.customer) return send(res, 400, { error: 'repo or customer required' });
+      const r = await searchCode({ ...body, q }, { apiKey: loadKey() });
+      return send(res, 200, r);
     }
     return send(res, 404, { error: 'not found' });
   } catch (e) {

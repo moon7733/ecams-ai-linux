@@ -66,6 +66,21 @@ Citation = {
 - **agy 폴백 없음**(분류와 다름): 대화형 응답에 수십초 지연은 부적합. 실패(502)면 PMS가 extractive 답변으로 폴백.
 - 모델 gemini-2.5-flash, 타임아웃 12s(브릿지 내부) / 15s(PMS `pms.ai.bridge.answer-timeout-ms`).
 
+### POST /pms/code-search  — 작업기록 수정 프로그램 자동완성
+
+요청은 `{repo?, customer?, q, kind?, topK?}`이고 응답은 아래 배열이다.
+
+```
+[{entityId, kind, name, paths[], score}]
+```
+
+- `q`는 2자 이상이며 `topK` 기본값은 8, 최대값은 50이다.
+- `customer`는 `companies.json`의 이름을 정규화해 찾고 `repos.json`의 `companyId`로 repo를 연결한다.
+- 정확 일치가 없으면 고객사명에 포함된 가장 긴 회사명을 사용한다. 예를 들어 `토스뱅크`는 `토스`로 연결된다.
+- 해당 고객사 소유이며 실제 엔티티 인덱스가 있는 repo만 검색한다.
+- `repo`와 `customer`가 함께 오면 repo 소유 고객사가 일치해야 한다.
+- `entityId`는 azbrain 식별자다. PMS는 이를 저장하지 않고 `name`과 `paths`만 사용한다.
+
 ### 에러
 `{ "error": "..." }` + 상태코드: 400(요청불량) / 401(토큰) / 502(Gemini 실패) / 500(내부).
 
