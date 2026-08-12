@@ -87,7 +87,10 @@ const server = http.createServer(async (req, res) => {
       const q = typeof body.q === 'string' ? body.q.trim() : '';
       if (Array.from(q).length < 2) return send(res, 400, { error: 'q must be at least 2 characters' });
       if (!body.repo && !body.customer) return send(res, 400, { error: 'repo or customer required' });
-      const r = await searchCode({ ...body, q }, { apiKey: loadKey() });
+      const r = await searchCode({ ...body, q }, {
+        baseUrl: process.env.AZBRAIN_INTERNAL_URL || 'http://ecams-ai:3000',
+        token: TOKEN
+      });
       return send(res, 200, r);
     }
     return send(res, 404, { error: 'not found' });

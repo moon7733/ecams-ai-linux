@@ -875,15 +875,7 @@ const SEARCH_MAX_CONTENT = 200;
 const SEARCH_MAX_PER_FILE = 20;
 const SEARCH_MAX_FILE_BYTES = 1500000;
 
-app.get('/api/fs/search', authMiddleware, (req, res) => {
-  const { repo } = req.query;
-  const q = (req.query.q || '').trim();
-  if (!getRepoLevel(req.user, repo, LOCAL_REPOS)) return res.status(403).json({ error: '권한이 없습니다.' });
-  if (q.length < 2) return res.json({ nameMatches: [], contentMatches: [], truncated: false });
-
-  const basePath = getRepoBasePath(repo);
-  if (!basePath || !fs.existsSync(basePath)) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
-
+function searchRepoSource(basePath, q, { includeContent = true, maxName = SEARCH_MAX_NAME } = {}) {
   const baseResolved = path.resolve(basePath);
   const ql = q.toLowerCase();
   const start = Date.now();
@@ -893,6 +885,7 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
   const stack = [baseResolved];
 
   while (stack.length) {
+    if (!includeContent && nameMatches.length >= maxName) break;
     if (Date.now() - start > SEARCH_BUDGET_MS) { truncated = true; break; }
     const dir = stack.pop();
     let entries;
@@ -904,17 +897,17 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
 
       if (e.isDirectory()) {
         if (!SHADOW_XD.includes(e.name)) stack.push(full);
-        if (nameMatches.length < SEARCH_MAX_NAME && e.name.toLowerCase().includes(ql))
+        if (nameMatches.length < maxName && e.name.toLowerCase().includes(ql))
           nameMatches.push({ path: rel, name: e.name, isDirectory: true });
         continue;
       }
 
       const fext = path.extname(e.name).toLowerCase();
-      if (nameMatches.length < SEARCH_MAX_NAME && !NAME_SKIP_EXTS.has(fext) && e.name.toLowerCase().includes(ql))
+      if (nameMatches.length < maxName && !NAME_SKIP_EXTS.has(fext) && e.name.toLowerCase().includes(ql))
         nameMatches.push({ path: rel, name: e.name, isDirectory: false });
 
       // 내용 검색 — 텍스트 확장자만, 대용량 제외
-      if (contentMatches.length >= SEARCH_MAX_CONTENT) continue;
+      if (!includeContent || contentMatches.length >= SEARCH_MAX_CONTENT) continue;
       if (!SOURCE_EXTS.has(fext)) continue;
       let stt; try { stt = fs.statSync(full); } catch (e) { continue; }
       if (stt.size > SEARCH_MAX_FILE_BYTES) continue;
@@ -931,7 +924,31 @@ app.get('/api/fs/search', authMiddleware, (req, res) => {
     }
   }
 
-  res.json({ nameMatches, contentMatches, truncated, elapsed: Date.now() - start });
+  return { nameMatches, contentMatches, truncated, elapsed: Date.now() - start };
+}
+
+app.get('/api/fs/search', authMiddleware, (req, res) => {
+  const { repo } = req.query;
+  const q = (req.query.q || '').trim();
+  if (!getRepoLevel(req.user, repo, LOCAL_REPOS)) return res.status(403).json({ error: '권한이 없습니다.' });
+  if (q.length < 2) return res.json({ nameMatches: [], contentMatches: [], truncated: false });
+  const basePath = getRepoBasePath(repo);
+  if (!basePath || !fs.existsSync(basePath)) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
+  res.json(searchRepoSource(basePath, q));
+});
+
+// pms-bridge 전용 검색. 사용자 세션 대신 같은 서비스 토큰을 쓰고 파일명 결과만 반환한다.
+app.post('/internal/pms/repo-search', (req, res) => {
+  const expectedToken = process.env.PMS_BRIDGE_TOKEN || '';
+  if (!expectedToken) return res.status(503).json({ error: 'PMS bridge token is not configured' });
+  if (req.headers['x-pms-token'] !== expectedToken) return res.status(401).json({ error: 'invalid token' });
+  const repo = typeof req.body?.repo === 'string' ? req.body.repo.trim() : '';
+  const q = typeof req.body?.q === 'string' ? req.body.q.trim() : '';
+  const maxName = Math.min(100, Math.max(1, Number(req.body?.limit) || 50));
+  if (q.length < 2) return res.json({ nameMatches: [], contentMatches: [], truncated: false });
+  const basePath = getRepoBasePath(repo);
+  if (!basePath || !fs.existsSync(basePath)) return res.status(404).json({ error: '레포지토리 경로를 찾을 수 없습니다.' });
+  res.json(searchRepoSource(basePath, q, { includeContent: false, maxName }));
 });
 
 // repoIds → 존재하는 repo 루트 절대경로 배열 (snapshot-restore 가 사용).

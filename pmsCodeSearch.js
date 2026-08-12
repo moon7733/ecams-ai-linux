@@ -1,9 +1,8 @@
 'use strict';
-// PMS 코드 자동완성을 위한 고객사별 저장소 연결과 엔티티 인덱스 검색을 제공한다.
+// PMS 코드 자동완성을 위해 고객사 repo를 연결하고 azbrain 소스뷰어 검색을 호출한다.
 
 const fs = require('fs');
 const path = require('path');
-const entityIndex = require('./entityIndexBuilder');
 
 function readJson(filePath, fallback) {
   try {
@@ -20,27 +19,17 @@ function normalizeCustomerName(value) {
     .replace(/[^0-9a-z가-힣]/g, '');
 }
 
-function normalizeCodeName(value) {
-  return String(value || '')
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[^0-9a-z가-힣]/g, '');
-}
-
 function findCompany(customerName, companies) {
   const target = normalizeCustomerName(customerName);
   if (!target) return null;
-
   const named = companies
     .map(company => ({ company, normalized: normalizeCustomerName(company.name) }))
     .filter(item => item.normalized);
   const exact = named.find(item => item.normalized === target);
   if (exact) return exact.company;
-
-  const contained = named
+  return named
     .filter(item => target.includes(item.normalized))
-    .sort((a, b) => b.normalized.length - a.normalized.length);
-  return contained[0]?.company || null;
+    .sort((a, b) => b.normalized.length - a.normalized.length)[0]?.company || null;
 }
 
 function loadRegistry(baseDir = __dirname) {
@@ -50,29 +39,18 @@ function loadRegistry(baseDir = __dirname) {
   };
 }
 
-function resolveRepoIds(
-  { repo, customer },
-  {
-    companies,
-    repos,
-    indexExists = repoId => fs.existsSync(entityIndex.indexPath(repoId))
-  }
-) {
+function resolveRepoIds({ repo, customer }, { companies, repos }) {
   const company = customer ? findCompany(customer, companies) : null;
   if (customer && !company) return [];
-
   const explicit = typeof repo === 'string' && repo.trim() ? [repo.trim()] : [];
   const candidates = explicit.length
     ? explicit
     : company
       ? Object.keys(repos).filter(repoId => repos[repoId]?.companyId === company.id)
       : [];
-
   return candidates.filter(repoId => {
     const info = repos[repoId];
-    if (!info) return false;
-    if (company && info.companyId !== company.id) return false;
-    return indexExists(repoId);
+    return Boolean(info && (!company || info.companyId === company.id));
   });
 }
 
@@ -81,69 +59,68 @@ function safeTopK(value) {
   return Number.isFinite(parsed) ? Math.min(50, Math.max(1, Math.trunc(parsed))) : 8;
 }
 
+async function searchSourceViewer(repo, q, options = {}) {
+  const baseUrl = options.baseUrl || process.env.AZBRAIN_INTERNAL_URL || 'http://ecams-ai:3000';
+  const token = options.token ?? process.env.PMS_BRIDGE_TOKEN ?? '';
+  const fetchImpl = options.fetchImpl || fetch;
+  const response = await fetchImpl(`${baseUrl.replace(/\/$/, '')}/internal/pms/repo-search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-PMS-Token': token
+    },
+    body: JSON.stringify({ repo, q, limit: options.limit || 50 })
+  });
+  if (!response.ok) throw new Error(`source viewer search status ${response.status}`);
+  return response.json();
+}
+
 async function searchCode(body, options = {}) {
   const registry = options.registry || loadRegistry(options.baseDir);
-  const repoIds = resolveRepoIds(body, {
-    ...registry,
-    indexExists: options.indexExists
-  });
+  const repoIds = resolveRepoIds(body, registry);
   const q = String(body.q || '').trim();
   const topK = safeTopK(body.topK);
   const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
-  const queryIndex = options.queryIndex || entityIndex.queryIndex;
-  const loadIndex = options.loadIndex || entityIndex.loadIndex;
-  const apiKey = options.apiKey || '';
+  const repoSearch = options.repoSearch || ((repoId, query) => searchSourceViewer(repoId, query, {
+    ...options,
+    limit: Math.min(100, Math.max(20, topK * 2))
+  }));
   const results = [];
-  const normalizedQuery = normalizeCodeName(q);
+  const seen = new Set();
 
   for (const repoId of repoIds) {
-    const index = loadIndex(repoId);
-    const entries = new Map((index?.entries || []).map(entry => [entry.id, entry]));
-    const ranked = [];
-    for (const entry of entries.values()) {
-      const normalizedName = normalizeCodeName(entry.name);
-      if (normalizedQuery && normalizedName.includes(normalizedQuery)) {
-        ranked.push({
-          id: entry.id,
-          kind: entry.kind,
-          name: entry.name,
-          score: 2 + (normalizedName.startsWith(normalizedQuery) ? 0.1 : 0)
-        });
-      }
-    }
+    let response;
     try {
-      ranked.push(...await queryIndex(repoId, q, apiKey, Math.min(50, topK * 3)));
+      response = await repoSearch(repoId, q);
     } catch (_) {
-      // 임베딩 검색 실패 시에도 이름 부분일치 결과는 사용할 수 있다.
+      continue;
     }
-    const seen = new Set();
-    ranked.sort((a, b) => b.score - a.score);
-    for (const hit of ranked) {
-      if (seen.has(hit.id)) continue;
-      seen.add(hit.id);
-      if (kind && String(hit.kind || '').toLowerCase() !== kind) continue;
-      const entry = entries.get(hit.id);
+    for (const match of response?.nameMatches || []) {
+      if (match.isDirectory || !match.name) continue;
+      const extension = path.extname(match.name).toLowerCase();
+      const itemKind = extension ? extension.slice(1) : 'file';
+      if (kind && itemKind !== kind) continue;
+      const key = String(match.name).normalize('NFKC').toLowerCase();
+      if (!seen.add(key)) continue;
       results.push({
-        entityId: hit.id,
-        kind: hit.kind,
-        name: hit.name,
-        paths: Array.isArray(entry?.sourcePaths) ? entry.sourcePaths : [],
-        score: hit.score
+        entityId: `file:${repoId}:${match.path}`,
+        kind: itemKind,
+        name: match.name,
+        paths: [match.path],
+        score: 2.1
       });
+      if (results.length >= topK) return results;
     }
   }
-
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
+  return results;
 }
 
 module.exports = {
-  normalizeCustomerName,
-  normalizeCodeName,
   findCompany,
   loadRegistry,
+  normalizeCustomerName,
   resolveRepoIds,
+  safeTopK,
   searchCode,
-  safeTopK
+  searchSourceViewer
 };

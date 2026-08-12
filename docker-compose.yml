@@ -45,6 +45,7 @@ services:
       - PORT=3000
       - WORKSPACE_DIR=/app/workspace
       - BACKUP_DIR=/app/backup
+      - PMS_BRIDGE_TOKEN=${PMS_BRIDGE_TOKEN:-}
       - PGHOST=${PGHOST:-192.168.0.21}
       - PGPORT=${PGPORT:-5432}
       - PGDATABASE=${PGDATABASE:-postgres}
@@ -60,6 +61,8 @@ services:
         APP_GID: ${APP_GID:-1015}
     container_name: pms-bridge
     command: ["node", "pmsBridge.js"]
+    depends_on:
+      - ecams-ai
     ports:
       - "${PMS_BRIDGE_PORT:-8790}:8790"
     volumes:
@@ -68,6 +71,7 @@ services:
     environment:
       - PMS_BRIDGE_PORT=8790
       - PMS_BRIDGE_TOKEN=${PMS_BRIDGE_TOKEN:-}
+      - AZBRAIN_INTERNAL_URL=http://ecams-ai:3000
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       # ?20.3 pgvector ??? ???. azbrain ?? DB ??? pms-bridge?? ????.
       - PGHOST=${PGHOST:-192.168.0.21}
