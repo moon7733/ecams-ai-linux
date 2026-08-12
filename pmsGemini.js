@@ -37,8 +37,9 @@ function callGemini(parts, { model, maxOutputTokens = 2048, timeoutMs = 30000 })
   return new Promise((resolve) => {
     const req = https.request(url, { method: 'POST', timeout: timeoutMs,
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, (r) => {
-      let b = ''; r.on('data', c => b += c);
-      r.on('end', () => { try { const j = JSON.parse(b); resolve({ text: j.candidates?.[0]?.content?.parts?.[0]?.text, err: j.error?.message }); } catch { resolve({ err: 'response parse failed' }); } });
+      // 청크마다 문자열로 붙이면 3바이트 한글이 경계에서 쪼개져 대체문자가 된다. 다 모아 한 번만 디코딩한다.
+      const chunks = []; r.on('data', c => chunks.push(c));
+      r.on('end', () => { const b = Buffer.concat(chunks).toString('utf8'); try { const j = JSON.parse(b); resolve({ text: j.candidates?.[0]?.content?.parts?.[0]?.text, err: j.error?.message }); } catch { resolve({ err: 'response parse failed' }); } });
     });
     req.on('error', e => resolve({ err: e.message }));
     req.on('timeout', () => { req.destroy(); resolve({ err: `timeout ${timeoutMs}ms` }); });
