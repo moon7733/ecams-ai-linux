@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const FALLBACK_CUSTOMER_NAME = '광주은행';
 
 function readJson(filePath, fallback) {
   try {
@@ -41,17 +42,25 @@ function loadRegistry(baseDir = __dirname) {
 
 function resolveRepoIds({ repo, customer }, { companies, repos }) {
   const company = customer ? findCompany(customer, companies) : null;
-  if (customer && !company) return [];
   const explicit = typeof repo === 'string' && repo.trim() ? [repo.trim()] : [];
-  const candidates = explicit.length
-    ? explicit
-    : company
-      ? Object.keys(repos).filter(repoId => repos[repoId]?.companyId === company.id)
-      : [];
-  return candidates.filter(repoId => {
-    const info = repos[repoId];
-    return Boolean(info && (!company || info.companyId === company.id));
-  });
+  if (explicit.length) {
+    if (customer && !company) return [];
+    return explicit.filter(repoId => {
+      const info = repos[repoId];
+      return Boolean(info && (!company || info.companyId === company.id));
+    });
+  }
+  if (!customer) return [];
+
+  const owned = company
+    ? Object.keys(repos).filter(repoId => repos[repoId]?.companyId === company.id)
+    : [];
+  if (owned.length) return owned;
+
+  const fallback = findCompany(FALLBACK_CUSTOMER_NAME, companies);
+  return fallback
+    ? Object.keys(repos).filter(repoId => repos[repoId]?.companyId === fallback.id)
+    : [];
 }
 
 function safeTopK(value) {

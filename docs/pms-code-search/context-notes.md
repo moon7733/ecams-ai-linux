@@ -7,6 +7,7 @@
 - 정확 일치가 없으면 PMS 이름 안에 포함된 회사명 중 가장 긴 이름만 선택한다.
   예를 들어 `토스뱅크`는 `토스`로 연결되고 `하나은행중국법인`은 더 긴 동일 회사에 연결된다.
 - 고객사 격리를 위해 선택된 회사의 `companyId`가 붙은 repo 외에는 검색하지 않는다.
+- 오너 승인에 따라 PMS 고객사를 찾지 못했거나 해당 회사에 repo가 없으면 광주은행 repo 전체를 샘플로 사용한다.
 - ignored 인덱스 파일은 배포 정본이 아니므로 사용하지 않는다. 고객사 repo 연결 뒤 azbrain 소스뷰어의
   기존 파일명 검색을 재사용하며, pms-bridge는 ecams-ai 내부 API만 호출한다.
 - PMS는 azbrain의 문자열 `entityId`를 저장하지 않고 파일명과 경로만 사용한다.
@@ -14,4 +15,5 @@
 - 최초 검증은 로컬 ignored 인덱스를 사용해 배포 환경을 재현하지 못했다. 이 방식은 폐기했다.
 - 변경 후 pms-bridge가 ecams-ai 소스뷰어 내부 검색을 호출해 광주은행 `cmr`에서
   `Cmr0100Servlet.java` 등 실제 repo 파일명을 168ms에 반환하는 것을 컨테이너 E2E로 확인했다.
+- repo가 없는 `고객사없음`도 광주은행 샘플 repo로 폴백해 같은 `cmr` 결과를 191ms에 반환했다.
 - PMS `.env`의 브릿지 URL은 위 Docker 호스트 주소로 바꿨다. 다만 실행 중 `pms-backend`가 다른 워크트리 Compose 소속이라 안전상 교체하지 못해 인증된 `/api/v1/knowledge/entities/autocomplete` 화면 E2E는 남았다.

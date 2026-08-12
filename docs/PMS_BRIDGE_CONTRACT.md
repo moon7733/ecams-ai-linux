@@ -78,6 +78,7 @@ Citation = {
 - `customer`는 `companies.json`의 이름을 정규화해 찾고 `repos.json`의 `companyId`로 repo를 연결한다.
 - 정확 일치가 없으면 고객사명에 포함된 가장 긴 회사명을 사용한다. 예를 들어 `토스뱅크`는 `토스`로 연결된다.
 - 해당 고객사 소유 repo를 azbrain 소스뷰어의 기존 파일명 검색으로 조회한다.
+- 고객사를 찾지 못했거나 연결된 repo가 없으면 광주은행 repo 전체를 샘플로 검색한다.
 - pms-bridge는 소스 파일을 직접 마운트하지 않고 같은 Compose의 ecams-ai 내부 검색 API를 서비스 토큰으로 호출한다.
 - `repo`와 `customer`가 함께 오면 repo 소유 고객사가 일치해야 한다.
 - `entityId`는 azbrain 식별자다. PMS는 이를 저장하지 않고 `name`과 `paths`만 사용한다.

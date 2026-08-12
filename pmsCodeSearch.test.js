@@ -15,7 +15,8 @@ const companies = [
   { id: 'gwangju', name: '광주은행' },
   { id: 'hana', name: '하나은행' },
   { id: 'hana-cn', name: '하나은행중국법인' },
-  { id: 'toss', name: '토스' }
+  { id: 'toss', name: '토스' },
+  { id: 'no-repo', name: '고객사없음' }
 ];
 const repos = {
   kjbank_html5: { companyId: 'gwangju' },
@@ -46,6 +47,17 @@ test('고객사와 함께 온 명시 repo가 다른 회사 소유면 차단한�
   assert.deepEqual(
     resolveRepoIds({ customer: '광주은행', repo: 'toss_html5' }, { companies, repos }),
     []
+  );
+});
+
+test('고객사에 repo가 없으면 광주은행 repo 전체를 샘플로 사용한다', () => {
+  assert.deepEqual(
+    resolveRepoIds({ customer: '고객사없음' }, { companies, repos }),
+    ['kjbank_html5', 'kjbank_server']
+  );
+  assert.deepEqual(
+    resolveRepoIds({ customer: '등록되지 않은 고객사' }, { companies, repos }),
+    ['kjbank_html5', 'kjbank_server']
   );
 });
 
