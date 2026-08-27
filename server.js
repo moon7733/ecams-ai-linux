@@ -403,7 +403,8 @@ app.get('/api/auth/google/url', (req, res) => {
     response_type: 'code',
     scope: 'openid email profile',
     access_type: 'offline',
-    prompt: 'select_account'
+    prompt: 'select_account',
+    hd: 'azsoft.kr'
   });
   res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` });
 });
@@ -427,6 +428,12 @@ app.get('/api/auth/google/callback', async (req, res) => {
     });
     const { email, name, picture } = userRes.data;
 
+    // azsoft.kr 사내 도메인 제한
+    if (!email || !email.toLowerCase().endsWith('@azsoft.kr')) {
+      console.warn(`[Google Auth] Non-azsoft domain attempted: ${email}`);
+      return res.redirect(`/#/login?error=${encodeURIComponent(`허용된 회사 Google 계정(@azsoft.kr)으로만 로그인할 수 있습니다. (시도한 계정: ${email || '알 수 없음'})`)}`);
+    }
+
     let matchedUserId = null;
     let matchedUser = null;
     for (const [uid, u] of Object.entries(USERS)) {
@@ -445,8 +452,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
     }
 
     if (!matchedUserId || !matchedUser) {
-      console.warn(`[Google Auth] Unauthorized email: ${email}`);
-      return res.redirect(`/#/login?error=${encodeURIComponent(`승인되지 않은 구글 계정(${email})입니다. 관리자에게 계정 등록을 요청하세요.`)}`);
+      console.warn(`[Google Auth] Unauthorized azsoft account: ${email}`);
+      return res.redirect(`/#/login?error=${encodeURIComponent(`등록되지 않은 azsoft 계정(${email})입니다. 관리자에게 문의하세요.`)}`);
     }
 
     const token = crypto.randomBytes(32).toString('hex');
