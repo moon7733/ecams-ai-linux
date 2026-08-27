@@ -1,6 +1,13 @@
-// Azbrain Vue 앱을 브라우저에 마운트하는 진입점
+// eCAMS AI Vue 앱 진입점 및 Pinia/Router 등록
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import App from './App.vue';
-import './styles.css';
+import router from './router';
 
-createApp(App).mount('#app');
+const app = createApp(App);
+const pinia = createPinia();
+
+app.use(pinia);
+app.use(router);
+
+app.mount('#app');

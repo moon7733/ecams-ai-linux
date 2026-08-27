@@ -3161,7 +3161,16 @@ app.post('/api/admin/guides/upload', authMiddleware, upload.single('docfile'), a
   });
 });
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+const frontendDist = path.join(__dirname, 'frontend', 'dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+  app.get('/', (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
+} else {
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+}
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => console.log('Server running: http://0.0.0.0:' + PORT));

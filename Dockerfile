@@ -46,6 +46,7 @@ ENV WORKSPACE_DIR=/app/workspace
 ENV BACKUP_DIR=/app/backup
 
 COPY --chown=node:node . .
+RUN if [ -f "frontend/package.json" ]; then cd frontend && npm install && npm run build && cd ..; fi
 
 EXPOSE 3000
 
