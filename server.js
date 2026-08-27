@@ -188,7 +188,13 @@ async function triggerIndexBuild(repoId, repoPath) {
 
 const app = express();
 app.use(express.json({ limit: '200mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+const frontendDist = path.join(__dirname, 'frontend', 'dist');
+if (fs.existsSync(frontendDist)) {
+  console.log('[Frontend] Serving Vue 3 frontend from:', frontendDist);
+  app.use(express.static(frontendDist));
+}
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // ===== 데이터 로드 및 저장 =====
 let USERS = {};
@@ -3161,16 +3167,13 @@ app.post('/api/admin/guides/upload', authMiddleware, upload.single('docfile'), a
   });
 });
 
-const frontendDist = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendDist)) {
-  console.log('[Frontend] Serving Vue 3 frontend from:', frontendDist);
-  app.use(express.static(frontendDist));
   app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-  app.use(express.static(path.join(__dirname, 'public')));
-  app.get('/', (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/internal')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
 } else {
-  console.log('[Frontend] Serving legacy vanilla frontend from public/');
-  app.use(express.static(path.join(__dirname, 'public')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 }
 
