@@ -44,6 +44,19 @@ console.error = function(...args) {
   originalError.apply(console, [getKoreanTime(), ...args]);
 };
 
+// agy CLI 실행 정의
+const AGY_EXE = process.env.AGY_EXE_PATH || (process.platform === 'win32'
+  ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
+  : 'agy');
+
+function stripAnsi(s) {
+  if (!s) return '';
+  return s
+    .replace(/\x1b\[[\d;?]*[a-zA-Z]/g, '')
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+}
+
 
 // ===== 결정 70: 지능형 전역 사전/스키마 메모리 로드 =====
 let globalCodeMap = {};
@@ -842,22 +855,48 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
   const promptFile = path.join(scratchDir, `analyze_prompt_${Date.now()}_${Math.random().toString(36).slice(2)}.txt`);
   fs.writeFileSync(promptFile, prompt, 'utf8');
 
-  const args = ['--model', MODEL_IDS.sonnet, '--dangerously-skip-permissions', 
-    '-p', `${promptFile.replace(/\\/g, '/')} 파일의 내용을 읽고 지시사항에 맞게 소스코드를 분석해줘.`];
-  const proc = spawn('agy', args, { shell: true, windowsHide: true, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const args = [
+    '--dangerously-skip-permissions',
+    '--print-timeout', '2m',
+    '-p', `${promptFile.replace(/\\/g, '/')} 파일의 내용을 읽고 지시사항에 맞게 소스코드를 분석해줘.`
+  ];
 
-  let out = '', err = '';
-  const killer = setTimeout(() => { try { proc.kill(); } catch (e) {} }, 120000);
-  proc.stdout.setEncoding('utf8');
-  proc.stderr.setEncoding('utf8');
-  proc.stdout.on('data', d => { out += d; });
-  proc.stderr.on('data', d => { err += d; });
-  proc.on('error', e => { clearTimeout(killer); res.status(500).json({ error: '분석 엔진 실행 실패: ' + e.message }); });
-  proc.on('close', code => {
+  let term;
+  try {
+    term = pty.spawn(AGY_EXE, args, {
+      name: 'xterm-color',
+      cols: 20000,
+      rows: 40,
+      cwd: __dirname,
+      env: process.env,
+    });
+  } catch (e) {
+    try { fs.unlinkSync(promptFile); } catch {}
+    console.error('[Analyze Spawn Error]:', e);
+    return res.status(500).json({ error: '분석 엔진 실행 실패: ' + e.message });
+  }
+
+  let buf = '';
+  const killer = setTimeout(() => {
+    try { term.kill(); } catch (e) {}
+  }, 120000);
+
+  term.onData(d => {
+    buf += d;
+  });
+
+  term.onExit(({ exitCode }) => {
     clearTimeout(killer);
-    const analysis = out.trim();
+    try { fs.unlinkSync(promptFile); } catch {}
+    const rawOutput = stripAnsi(buf);
+    const lines = rawOutput.split('\n');
+    const hasHangul = s => /[가-힣]/.test(s);
+    let start = 0;
+    while (start < lines.length && !hasHangul(lines[start])) start++;
+    const analysis = lines.slice(start).join('\n').trim();
+
     if (!analysis) {
-      console.error('[Analyze] empty output, code=', code, 'stderr=', err.slice(0, 300));
+      console.error('[Analyze] empty output, code=', exitCode, 'raw=', rawOutput.slice(0, 300));
       return res.status(500).json({ error: '분석 결과를 생성하지 못했습니다.' });
     }
     res.json({ analysis });
@@ -2034,10 +2073,6 @@ async function prepareShadows(allowedRepos) {
   return { cwd: wsShadowRoot, includeDirs };
 }
 
-// agy CLI 통합 — 결정 11 (2026-06-01): node-pty 로 ConPTY wrapping. raw spawn 은 stdout TTY 미감지 시 응답 직전 셧다운 (silent fail). docs/agy-integration/context-notes.md 참고.
-const AGY_EXE = process.env.AGY_EXE_PATH || (process.platform === 'win32'
-  ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
-  : 'agy');
 const CODEX_EXE = process.env.CODEX_EXE || path.join(os.homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'd8dfab353c0001dc', 'codex.exe');
 
 // AGY 비결정성: 분석을 끝내지 않고 짧은 영문 placeholder("I am waiting for the ... search to complete...")만 내고 종료하는 bail 감지.
@@ -2087,13 +2122,6 @@ function logAgy(msg) {
     fs.mkdirSync(path.dirname(AGY_DEBUG_LOG), { recursive: true });
     fs.appendFileSync(AGY_DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`, 'utf8');
   } catch (e) {}
-}
-
-function stripAnsi(s) {
-  return s
-    .replace(/\x1b\[[\d;?]*[a-zA-Z]/g, '')
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
 }
 
 function runAgyOnce(fullPrompt, res, cwd, includeDirs, req = null) {
