@@ -51,6 +51,9 @@ services:
       - PGDATABASE=${PGDATABASE:-postgres}
       - PGUSER=${PGUSER:-azbrain}
       - PGPASSWORD=${PGPASSWORD:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-https://ecams.tail4f6f17.ts.net:10000/api/auth/google/callback}
     restart: unless-stopped
 
   pms-bridge:
