@@ -18,7 +18,7 @@ PMS_BRIDGE_TOKEN=<서비스토큰> PMS_BRIDGE_PORT=8790 node pmsBridge.js
 
 ### POST /pms/classify   — 텍스트 인수인계 덤프 분류
 요청: `{ "text": "..." }`
-응답: `{ "items": [ ClassifiedItem ], "elapsedMs": 1500, "model": "gemini-3.7-flash" }`
+응답: `{ "items": [ ClassifiedItem ], "elapsedMs": 1500, "model": "gemini-2.5-flash" }`
 ```
 ClassifiedItem = {
   target:   "info" | "knowledge" | "credential",
@@ -31,7 +31,7 @@ ClassifiedItem = {
 ```
 - **category = 의미 기반 6분류**(값이 아니라 뜻으로). 예: "형상관리 정기점검 방문 문자(날짜·담당·연락처)"는 형상 단어가 있어도 ACCESS가 아니라 **CONTACT**. PMS는 이 값을 그대로 저장(pms 키워드 재분류 안 함).
 - knownTags(선택): `{text, knownTags:[...]}` 로 tag 어휘 일관성 힌트 전달 가능.
-- 모델 **gemini-3.7-flash** (flash-lite 환각 확인 이후 성능 및 안정성 확보를 위해 도입). 실측 ~1.5s.
+- 모델 **gemini-2.5-flash** (flash-lite는 환각 확인되어 교체). 실측 ~1.5s.
 - ⚠️ **호출 전 PMS가 비번·경로 등 민감정보를 마스킹**해서 `text`에 안 넣어야 함(브릿지는 받은 걸 그대로 Gemini로 보냄).
 
 ### POST /pms/wbs-vision  — WBS 사진 → 구조화 행
@@ -49,7 +49,7 @@ notes = 우측 협조요청/비고 등 특정 행에 안 묶이는 프로젝트 
 
 ### POST /pms/assistant-answer  — FIND 생성형 답변 합성 (2026-07-23, 갭 리뷰 §20.2)
 요청: `{ "question": "...", "mode": "CURRENT"|"HISTORY", "citations": [ Citation ] }`
-응답: `{ "answer": "...", "followUps": ["...", ...], "elapsedMs": 1500, "model": "gemini-3.7-flash" }`
+응답: `{ "answer": "...", "followUps": ["...", ...], "elapsedMs": 1500, "model": "gemini-2.5-flash" }`
 ```
 Citation = {
   no:         number,           // 근거 번호(1부터) — answer가 [1], [2]로 인용
@@ -64,7 +64,7 @@ Citation = {
 - 프롬프트가 citation 밖 사실 생성 금지·근거 번호 인용을 강제. [SECRET] 근거는 값 추측 금지, 열람 절차 안내만.
 - citations가 비면 400 — 근거 없는 합성은 하지 않는다(PMS extractive '근거 없음' 유지).
 - **agy 폴백 없음**(분류와 다름): 대화형 응답에 수십초 지연은 부적합. 실패(502)면 PMS가 extractive 답변으로 폴백.
-- 모델 gemini-3.7-flash, 타임아웃 12s(브릿지 내부) / 15s(PMS `pms.ai.bridge.answer-timeout-ms`).
+- 모델 gemini-2.5-flash, 타임아웃 12s(브릿지 내부) / 15s(PMS `pms.ai.bridge.answer-timeout-ms`).
 
 ### POST /pms/code-search  — 작업기록 수정 프로그램 자동완성
 

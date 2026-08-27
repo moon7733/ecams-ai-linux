@@ -9,9 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// 텍스트 분류: flash-lite 는 환각(입력에 없는 항목 생성·실제 항목 누락) 확인 → 3.7-flash 도입으로 성능 및 안정성 확보.
+// 텍스트 분류: flash-lite 는 환각(입력에 없는 항목 생성·실제 항목 누락) 확인 → 2.5-flash 로 충실도 확보(실측 ~1.5s).
 // WBS 비전: flash-lite 로도 29행 정확 추출(~7s) → 저렴한 lite 유지.
-const TEXT_MODEL = process.env.PMS_CLASSIFY_MODEL || 'gemini-3.7-flash';
+const TEXT_MODEL = process.env.PMS_CLASSIFY_MODEL || 'gemini-2.5-flash';
 const VISION_MODEL = process.env.PMS_VISION_MODEL || 'gemini-3.1-flash-lite';
 
 function loadKey() {
