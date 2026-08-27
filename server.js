@@ -837,8 +837,13 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
 
   const prompt = `${instruction}\n\n파일명: ${filename || '(미상)'}\n\n\`\`\`\n${text}\n\`\`\``;
 
-  const args = ['-p', '--model', MODEL_IDS.sonnet,
-    '--dangerously-skip-permissions'];
+  const scratchDir = path.join(__dirname, 'scratch');
+  if (!fs.existsSync(scratchDir)) fs.mkdirSync(scratchDir, { recursive: true });
+  const promptFile = path.join(scratchDir, `analyze_prompt_${Date.now()}_${Math.random().toString(36).slice(2)}.txt`);
+  fs.writeFileSync(promptFile, prompt, 'utf8');
+
+  const args = ['--model', MODEL_IDS.sonnet, '--dangerously-skip-permissions', 
+    '-p', `${promptFile.replace(/\\/g, '/')} 파일의 내용을 읽고 지시사항에 맞게 소스코드를 분석해줘.`];
   const proc = spawn('agy', args, { shell: true, windowsHide: true, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
 
   let out = '', err = '';
@@ -857,9 +862,6 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
     }
     res.json({ analysis });
   });
-  proc.stdin.on('error', () => {}); // EPIPE 무시
-  proc.stdin.write(prompt, 'utf8');
-  proc.stdin.end();
 });
 
 // ===== 소스 검색 API — 레포 전체 파일명 + 내용(grep). 동기 walk + 타임버짓(이벤트루프 장시간 점유 방지). =====
