@@ -1,6 +1,7 @@
 <!-- 결재함 (Admin) 모달 컴포넌트 -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import SvgIcon from '@/components/SvgIcon.vue';
 import { fetchApprovals, approveRequest, rejectRequest } from '@/api/admin';
 
 const props = defineProps<{
@@ -52,85 +53,44 @@ async function handleReject(id: string) {
 </script>
 
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click="emit('close')">
-    <div class="modal-card" @click.stop>
-      <div class="modal-head">
-        <h3>🛡️ 결재함 (Admin)</h3>
-        <button class="close-btn" @click="emit('close')">✕</button>
+  <div v-if="isOpen" class="modal-overlay" @click="emit('close')">
+    <div class="modal-card" style="max-width: 540px;" @click.stop>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2><SvgIcon name="shield" size="20" /> 결재함 (관리자)</h2>
+        <button class="logout-btn" style="font-size:18px;" @click="emit('close')">✕</button>
       </div>
 
-      <div class="modal-body">
-        <div v-if="loading" class="state-msg">목록을 불러오는 중...</div>
-        <div v-else-if="error" class="error-msg">{{ error }}</div>
-        <div v-else-if="requests.length === 0" class="state-msg">대기 중인 결재 요청이 없습니다.</div>
+      <div v-if="loading" style="text-align:center; padding:20px; color:var(--text3); font-size:13px;">
+        불러오는 중...
+      </div>
+      <div v-else-if="error" class="modal-error">{{ error }}</div>
 
-        <div v-else class="req-list">
-          <div v-for="req in requests" :key="req.id" class="req-item">
-            <div class="req-info">
-              <span class="req-user">👤 {{ req.userId }}</span>
-              <span class="req-detail">🏢 {{ req.companyName || req.companyId }} ({{ req.level === 'edit' ? '수정' : '읽기' }})</span>
-            </div>
-            <div class="req-actions">
-              <button class="btn-approve" @click="handleApprove(req.id)">승인</button>
-              <button class="btn-reject" @click="handleReject(req.id)">반려</button>
-            </div>
+      <div v-else class="approval-list">
+        <div v-if="requests.length === 0" style="text-align:center; padding:30px 0; color:var(--text3); font-size:13px;">
+          대기 중인 결재 요청이 없습니다.
+        </div>
+
+        <div v-for="req in requests" :key="req.id" class="list-item" style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <strong style="color:var(--text);">{{ req.name || req.userId }} ({{ req.userId }})</strong>
+            <span class="badge" style="font-size:10px;">{{ req.type === 'company' ? '고객사 권한' : req.type }}</span>
+          </div>
+
+          <div style="font-size:12px; color:var(--text2);">
+            <div v-if="req.type === 'company'">고객사: <strong>{{ req.companyId }}</strong> ({{ req.level || 'read' }})</div>
+            <div v-if="req.affiliation">소속: {{ req.affiliation }}</div>
+            <div v-if="req.phone">연락처: {{ req.phone }}</div>
+            <div style="color:var(--text3); font-size:11px; margin-top:2px;">{{ new Date(req.timestamp).toLocaleString('ko-KR') }}</div>
+          </div>
+
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <button style="flex:1; padding:6px 0; font-size:12px; background:var(--accent);" @click="handleApprove(req.id)">승인</button>
+            <button class="outline" style="flex:1; padding:6px 0; font-size:12px; color:var(--danger);" @click="handleReject(req.id)">반려</button>
           </div>
         </div>
       </div>
 
-      <div class="modal-foot">
-        <button class="btn-close" @click="emit('close')">닫기</button>
-      </div>
+      <button class="outline" style="margin-top:16px;" @click="emit('close')">닫기</button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-.modal-card {
-  width: 90%;
-  max-width: 500px;
-  background: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-}
-.modal-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-.modal-head h3 { margin: 0; font-size: 16px; color: #1e293b; }
-.close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; }
-.modal-body { padding: 20px; max-height: 400px; overflow-y: auto; }
-.state-msg { text-align: center; color: #64748b; font-size: 13.5px; padding: 20px; }
-.error-msg { color: #ef4444; font-size: 13px; }
-.req-list { display: flex; flex-direction: column; gap: 10px; }
-.req-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-.req-info { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-.req-user { font-weight: 700; color: #0f172a; }
-.req-detail { color: #475569; font-size: 12px; }
-.req-actions { display: flex; gap: 6px; }
-.btn-approve { background: #3b82f6; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; }
-.btn-reject { background: #ef4444; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; }
-.modal-foot { padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
-.btn-close { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
-</style>

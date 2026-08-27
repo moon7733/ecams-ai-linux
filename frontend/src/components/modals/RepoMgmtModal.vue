@@ -1,6 +1,7 @@
 <!-- 새 레포지토리 등록 (ZIP / Git Clone) 모달 컴포넌트 -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import SvgIcon from '@/components/SvgIcon.vue';
 import { createRepoZip, createRepoGit } from '@/api/admin';
 import { fetchCompanies } from '@/api/chat';
 
@@ -96,84 +97,53 @@ async function handleGitSubmit() {
 </script>
 
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click="emit('close')">
-    <div class="modal-card" @click.stop>
-      <div class="modal-head">
-        <h3>📁 새 레포지토리 등록</h3>
-        <button class="close-btn" @click="emit('close')">✕</button>
+  <div v-if="isOpen" class="modal-overlay" @click="emit('close')">
+    <div class="modal-card" style="max-width: 480px;" @click.stop>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2><SvgIcon name="folderPlus" size="20" /> 레포지토리 관리</h2>
+        <button class="logout-btn" style="font-size:18px;" @click="emit('close')">✕</button>
       </div>
 
-      <div class="modal-body">
-        <div class="tab-bar">
-          <button class="tab-btn" :class="{ active: activeTab === 'zip' }" @click="activeTab = 'zip'">ZIP 파일 업로드</button>
-          <button class="tab-btn" :class="{ active: activeTab === 'git' }" @click="activeTab = 'git'">Git Clone</button>
-        </div>
-
-        <div class="form-group">
-          <label>소속 고객사</label>
-          <select v-model="selectedCompany">
-            <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </div>
-
-        <!-- ZIP Form -->
-        <div v-if="activeTab === 'zip'" class="tab-form">
-          <div class="form-group">
-            <label>레포지토리 이름</label>
-            <input v-model="repoNameZip" type="text" placeholder="예: kjbank_html5" />
-          </div>
-          <div class="form-group">
-            <label>ZIP 파일 선택</label>
-            <input type="file" accept=".zip" @change="handleFileSelect" />
-          </div>
-          <button class="btn-submit" :disabled="submitting" @click="handleZipSubmit">
-            {{ submitting ? '업로드 및 분석 중...' : '업로드 및 저장' }}
-          </button>
-        </div>
-
-        <!-- Git Form -->
-        <div v-if="activeTab === 'git'" class="tab-form">
-          <div class="form-group">
-            <label>레포지토리 이름</label>
-            <input v-model="repoNameGit" type="text" placeholder="예: kjbank_server" />
-          </div>
-          <div class="form-group">
-            <label>Git URL</label>
-            <input v-model="gitUrl" type="text" placeholder="https://github.com/..." />
-          </div>
-          <div class="form-group">
-            <label>Access Token (선택)</label>
-            <input v-model="gitToken" type="password" placeholder="비공개 레포지토리 토큰" />
-          </div>
-          <button class="btn-submit" :disabled="submitting" @click="handleGitSubmit">
-            {{ submitting ? 'Git Clone 진행 중...' : 'Git Clone 및 저장' }}
-          </button>
-        </div>
+      <div class="tab-buttons">
+        <div class="tab-btn" :class="{ active: activeTab === 'zip' }" @click="activeTab = 'zip'">ZIP 파일 업로드</div>
+        <div class="tab-btn" :class="{ active: activeTab === 'git' }" @click="activeTab = 'git'">Git Clone</div>
       </div>
 
-      <div class="modal-foot">
-        <button class="btn-close" @click="emit('close')">닫기</button>
+      <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">소속 고객사</label>
+      <select v-model="selectedCompany">
+        <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+      </select>
+
+      <!-- ZIP Form -->
+      <div v-if="activeTab === 'zip'">
+        <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">레포지토리 이름</label>
+        <input v-model="repoNameZip" type="text" placeholder="예: kjbank_html5" />
+
+        <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">ZIP 파일</label>
+        <input type="file" accept=".zip" @change="handleFileSelect" />
+
+        <button :disabled="submitting" style="margin-top:8px; background:var(--accent);" @click="handleZipSubmit">
+          {{ submitting ? '업로드 및 분석 중...' : '업로드 및 저장' }}
+        </button>
       </div>
+
+      <!-- Git Form -->
+      <div v-if="activeTab === 'git'">
+        <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">레포지토리 이름</label>
+        <input v-model="repoNameGit" type="text" placeholder="예: kjbank_server" />
+
+        <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">Git URL</label>
+        <input v-model="gitUrl" type="text" placeholder="https://github.com/..." />
+
+        <label style="font-size:12px; font-weight:600; color:var(--text2); display:block; margin-bottom:4px;">Access Token (선택)</label>
+        <input v-model="gitToken" type="password" placeholder="비공개 레포지토리 토큰" />
+
+        <button :disabled="submitting" style="margin-top:8px; background:var(--accent);" @click="handleGitSubmit">
+          {{ submitting ? 'Git Clone 진행 중...' : 'Git Clone 및 저장' }}
+        </button>
+      </div>
+
+      <button class="outline" style="margin-top:6px;" @click="emit('close')">닫기</button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-card { width: 90%; max-width: 480px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
-.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
-.modal-head h3 { margin: 0; font-size: 16px; color: #1e293b; }
-.close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; }
-.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; margin-bottom: 4px; }
-.tab-btn { flex: 1; padding: 8px; border: none; background: none; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
-.tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-.tab-form { display: flex; flex-direction: column; gap: 12px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 12px; font-weight: 600; color: #475569; }
-.form-group input, .form-group select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-.btn-submit { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; margin-top: 6px; }
-.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-.modal-foot { padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
-.btn-close { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
-</style>

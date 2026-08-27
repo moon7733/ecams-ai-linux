@@ -1,8 +1,9 @@
-<!-- eCAMS AI 메인 채팅 및 분석 작업 공간 뷰 (기존 모든 모달 및 사이드바 기능 통합) -->
+<!-- eCAMS AI 메인 채팅 뷰 (AS-IS 정본 디자인 1:1 완벽 일치 & 반응형 모바일 지원) -->
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
+import SvgIcon from '@/components/SvgIcon.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
 import SourceViewerModal from '@/components/modals/SourceViewerModal.vue';
 import ApprovalModal from '@/components/modals/ApprovalModal.vue';
@@ -21,15 +22,12 @@ const chatStore = useChatStore();
 
 const inputText = ref('');
 const messageContainer = ref<HTMLElement | null>(null);
-const imgUploadInput = ref<HTMLInputElement | null>(null);
-const repoSearch = ref('');
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const isMobileMenuOpen = ref(false);
 
-function triggerImageUpload() {
-  imgUploadInput.value?.click();
-}
 const isFastMode = ref(true);
 const isConciseMode = ref(true);
-const attachedImages = ref<Array<{ data: string; mime: string; name: string }>>([]);
+const attachedImages = ref<Array<{ data: string; mime: string; name: string; url: string }>>([]);
 
 // Modals State
 const showApprovalModal = ref(false);
@@ -44,7 +42,11 @@ const showSourceModal = ref(false);
 const sourceModalPath = ref('');
 const sourceModalLine = ref(1);
 
+// Theme State
+const currentTheme = ref(localStorage.getItem('theme') || 'light');
+
 onMounted(async () => {
+  document.documentElement.setAttribute('data-theme', currentTheme.value);
   await authStore.fetchUser();
   await chatStore.loadInitialData();
   if (chatStore.currentMessages.length === 0) {
@@ -52,6 +54,13 @@ onMounted(async () => {
   }
   scrollToBottom();
 });
+
+function toggleTheme() {
+  const next = currentTheme.value === 'dark' ? 'light' : 'dark';
+  currentTheme.value = next;
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+}
 
 function scrollToBottom() {
   nextTick(() => {
@@ -61,50 +70,62 @@ function scrollToBottom() {
   });
 }
 
-// Repositories filtering & selection
-const regularRepos = computed(() => {
-  const q = repoSearch.value.toLowerCase().trim();
-  return Object.keys(chatStore.repos).filter((r) => {
-    const isDb = r.includes('_db') || chatStore.repoMeta[r]?.type === 'db';
-    if (isDb) return false;
-    return !q || r.toLowerCase().includes(q);
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  isMobileMenuOpen.value = false;
+}
+
+// Company & Repos Grouping (AS-IS renderRepos 로직)
+const companyGroups = computed(() => {
+  const companyMap: Record<string, string> = {};
+  chatStore.companies.forEach(c => companyMap[c.id] = c.name);
+  companyMap['none'] = '고객사 없음';
+
+  const groups: Record<string, { id: string; repos: string[]; name: string }> = {};
+  Object.keys(chatStore.repos).forEach(repoId => {
+    const info = chatStore.repoMeta[repoId] || { companyId: 'none', type: 'server' };
+    const cid = info.companyId || 'none';
+    if (!groups[cid]) {
+      groups[cid] = { id: cid, repos: [], name: companyMap[cid] || cid };
+    }
+    groups[cid].repos.push(repoId);
+  });
+
+  return Object.values(groups).sort((a, b) => {
+    if (a.id === 'none') return 1;
+    if (b.id === 'none') return -1;
+    return a.name.localeCompare(b.name, 'ko');
   });
 });
 
-const dbRepos = computed(() => {
-  const q = repoSearch.value.toLowerCase().trim();
-  return Object.keys(chatStore.repos).filter((r) => {
-    const isDb = r.includes('_db') || chatStore.repoMeta[r]?.type === 'db';
-    if (!isDb) return false;
-    return !q || r.toLowerCase().includes(q);
-  });
-});
+function isGroupSelected(groupRepos: string[]) {
+  return groupRepos.length > 0 && groupRepos.every(r => chatStore.selectedRepos.includes(r));
+}
 
-const isAllSelected = computed(() => {
-  const all = [...regularRepos.value, ...dbRepos.value];
-  return all.length > 0 && all.every((r) => chatStore.selectedRepos.includes(r));
-});
-
-function toggleSelectAll() {
-  const all = [...regularRepos.value, ...dbRepos.value];
-  if (isAllSelected.value) {
-    chatStore.selectedRepos = [];
-  } else {
-    chatStore.selectedRepos = [...all];
+function toggleCompanyGroup(group: { id: string; repos: string[]; name: string }) {
+  // AS-IS toggleGroup: 단일 고객사 선택
+  chatStore.selectedRepos = [];
+  const currentlySelected = isGroupSelected(group.repos);
+  if (!currentlySelected) {
+    chatStore.selectedRepos = [...group.repos];
+    chatStore.selectedCompany = group.id;
   }
 }
 
-function toggleRepo(repoId: string) {
-  const idx = chatStore.selectedRepos.indexOf(repoId);
-  if (idx > -1) {
-    chatStore.selectedRepos.splice(idx, 1);
-  } else {
-    chatStore.selectedRepos.push(repoId);
-  }
+const currentCompanyName = computed(() => {
+  const matched = chatStore.companies.find(c => c.id === chatStore.selectedCompany);
+  return matched ? matched.name : (chatStore.selectedCompany ? '선택됨' : '');
+});
+
+// Image Attachments
+function triggerFileInput() {
+  fileInputRef.value?.click();
 }
 
-// Image handling
-function handleImageAttach(e: Event) {
+function handleFileChange(e: Event) {
   const target = e.target as HTMLInputElement;
   if (!target.files) return;
   for (let i = 0; i < target.files.length; i++) {
@@ -117,6 +138,7 @@ function handleImageAttach(e: Event) {
         data: base64,
         mime: file.type,
         name: file.name,
+        url: result,
       });
     };
     reader.readAsDataURL(file);
@@ -127,15 +149,16 @@ function removeImage(idx: number) {
   attachedImages.value.splice(idx, 1);
 }
 
-// Source Viewer Open
+// Source Viewer
 function handleOpenSource(filePath: string, line?: number) {
   sourceModalPath.value = filePath;
   sourceModalLine.value = line || 1;
   showSourceModal.value = true;
+  closeMobileMenu();
 }
 
 function handleAskAboutCode(codeSnippet: string, filename: string) {
-  inputText.value = `파일명: ${filename}\n\`\`\`\n${codeSnippet}\n\`\`\`\n\n위 소스 코드의 핵심 로직을 설명해줘.`;
+  inputText.value = `파일명: ${filename}\n\`\`\`\n${codeSnippet}\n\`\`\`\n\n위 소스 코드의 핵심 로직과 처리 흐름을 설명해줘.`;
 }
 
 // Send Message
@@ -147,19 +170,19 @@ async function handleSendMessage(customPrompt?: string) {
   const currentImgs = [...attachedImages.value];
   attachedImages.value = [];
 
-  // User message
+  // 1. User message
   chatStore.currentMessages.push({
     role: 'user',
     content: textToSend,
     createdAt: Date.now(),
   });
 
-  // Bot message
+  // 2. Bot message placeholder
   const botMessageIndex = chatStore.currentMessages.length;
   chatStore.currentMessages.push({
     role: 'assistant',
     content: '',
-    statusText: '🌌 분석 준비 중...',
+    statusText: '분석 준비 중...',
     createdAt: Date.now(),
   });
 
@@ -171,7 +194,7 @@ async function handleSendMessage(customPrompt?: string) {
       message: textToSend,
       repos: chatStore.selectedRepos,
       model: chatStore.selectedModel,
-      images: currentImgs,
+      images: currentImgs.map(im => ({ data: im.data, mime: im.mime })),
       fastMode: isFastMode.value,
       concise: isConciseMode.value,
     });
@@ -202,7 +225,7 @@ async function handleSendMessage(customPrompt?: string) {
     });
     await chatStore.loadHistory();
   } catch (err: any) {
-    chatStore.currentMessages[botMessageIndex].content = `오류: ${err.response?.data?.error || err.message || '요청 실패'}`;
+    chatStore.currentMessages[botMessageIndex].content = `오류: ${err.response?.data?.error || err.message || '분석 요청 실패'}`;
     chatStore.currentMessages[botMessageIndex].statusText = '';
   } finally {
     chatStore.isStreaming = false;
@@ -244,137 +267,157 @@ function handleKeyDown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="workspace-layout">
-    <!-- 좌측 메인 사이드바 -->
-    <aside class="sidebar">
-      <!-- 1. 사이드바 헤더 및 로고 -->
+  <div class="app-layout">
+    <!-- 모바일 백드롭 -->
+    <div class="mobile-backdrop" :class="{ open: isMobileMenuOpen }" @click="closeMobileMenu"></div>
+
+    <!-- 좌측 사이드바 -->
+    <aside class="sidebar" :class="{ 'mobile-open': isMobileMenuOpen }">
       <div class="sidebar-header">
-        <div class="brand">
-          <span class="logo-ico">🔍</span>
-          <strong>eCAMS AI</strong>
-        </div>
-        <button class="logout-btn" title="로그아웃" @click="authStore.logout()">🚪</button>
-      </div>
-
-      <!-- 2. 상단 액션 버튼들 -->
-      <div class="action-btn-group">
-        <a href="/" class="btn-switch-classic">🔙 클래식 화면 전환</a>
-        <button class="btn-new-chat" @click="chatStore.startNewChat()">📝 새 대화</button>
-
-        <!-- Admin 전용 메뉴 그룹 -->
-        <div v-if="authStore.isAdmin" class="admin-menu-group">
-          <button class="btn-menu admin" @click="showApprovalModal = true">🛡️ 결재함 (Admin)</button>
-          <button class="btn-menu admin" @click="showUserMgmtModal = true">👥 사용자 관리</button>
-          <button class="btn-menu admin" @click="showCompanyMgmtModal = true">🏢 고객사 관리</button>
-          <button class="btn-menu admin" @click="showIndexMgmtModal = true">🗄️ 인덱스 관리</button>
-          <button class="btn-menu admin" @click="showGuideUploadModal = true">📄 가이드 업로드</button>
+        <div class="logo">
+          <div class="logo-icon"><SvgIcon name="search" size="14" /></div>
+          eCAMS AI
+          <button class="logout-btn" title="로그아웃" @click="authStore.logout()">
+            <SvgIcon name="logout" size="14" />
+          </button>
         </div>
 
-        <!-- 공통 액션 메뉴 -->
-        <button class="btn-menu" @click="showSourceModal = true">💻 소스 뷰어</button>
-        <button class="btn-menu wiki" @click="showWikiModal = true">📖 LLM Wiki</button>
-        <button class="btn-menu" @click="showRepoModal = true">📁 새 레포지토리</button>
-        <button class="btn-menu" @click="showAuthModal = true">🔑 권한 신청</button>
-      </div>
+        <a href="/" class="action-btn" style="color:var(--accent); font-weight:600; margin-bottom:6px;">
+          <SvgIcon name="arrowLeft" size="14" /> 클래식 화면 전환
+        </a>
 
-      <!-- 3. 고객사 선택 드롭다운 -->
-      <div class="company-section">
-        <label>고객사 선택</label>
-        <select v-model="chatStore.selectedCompany" @change="chatStore.selectCompany(chatStore.selectedCompany)">
-          <option v-for="c in chatStore.companies" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-      </div>
+        <button class="new-chat-btn" @click="chatStore.startNewChat(); closeMobileMenu();">
+          <SvgIcon name="edit" size="15" /> 새 대화
+        </button>
 
-      <!-- 4. 내 레포지토리 섹션 (체크박스 및 전체선택) -->
-      <div class="repo-section">
-        <div class="section-head">
-          <span>내 레포지토리</span>
-          <label class="select-all-label">
-            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" /> 전체선택
-          </label>
+        <!-- Admin 메뉴 그룹 -->
+        <div v-if="authStore.isAdmin" class="admin-menu">
+          <button class="action-btn admin" @click="showApprovalModal = true; closeMobileMenu();">
+            <SvgIcon name="shield" size="14" /> 결재함 (Admin)
+          </button>
+          <button class="action-btn admin" @click="showUserMgmtModal = true; closeMobileMenu();">
+            <SvgIcon name="users" size="14" /> 사용자 관리
+          </button>
+          <button class="action-btn admin" @click="showCompanyMgmtModal = true; closeMobileMenu();">
+            <SvgIcon name="building" size="14" /> 고객사 관리
+          </button>
+          <button class="action-btn admin" @click="showIndexMgmtModal = true; closeMobileMenu();">
+            <SvgIcon name="database" size="14" /> 인덱스 관리
+          </button>
+          <button class="action-btn admin" @click="showGuideUploadModal = true; closeMobileMenu();">
+            <SvgIcon name="file" size="14" /> 가이드 업로드
+          </button>
         </div>
-        <input v-model="repoSearch" type="text" placeholder="레포 검색..." class="repo-search-input" />
-        
+
+        <!-- 공통 액션 버튼 -->
+        <button class="action-btn" @click="showSourceModal = true; closeMobileMenu();">
+          <SvgIcon name="code" size="14" /> 소스 뷰어
+        </button>
+        <button class="action-btn" style="color: var(--green);" @click="showWikiModal = true; closeMobileMenu();">
+          <SvgIcon name="book" size="14" /> LLM Wiki
+        </button>
+        <button class="action-btn" @click="showRepoModal = true; closeMobileMenu();">
+          <SvgIcon name="folderPlus" size="14" /> 새 레포지토리
+        </button>
+        <button class="action-btn" @click="showAuthModal = true; closeMobileMenu();">
+          <SvgIcon name="key" size="14" /> 권한 신청
+        </button>
+      </div>
+
+      <!-- 내 레포지토리 (고객사별 모듈 그룹핑) -->
+      <div class="sidebar-section">
+        <div class="section-label">
+          내 레포지토리
+        </div>
         <div class="repo-list">
-          <label v-for="r in regularRepos" :key="r" class="repo-check-item">
-            <input
-              type="checkbox"
-              :checked="chatStore.selectedRepos.includes(r)"
-              @change="toggleRepo(r)"
-            />
-            <span class="repo-name">{{ r }}</span>
-          </label>
-        </div>
-
-        <!-- 데이터베이스 (DB) 섹션 -->
-        <div v-if="dbRepos.length > 0" class="db-section">
-          <span class="db-title">📂 데이터베이스 (DB)</span>
-          <div class="repo-list">
-            <label v-for="r in dbRepos" :key="r" class="repo-check-item">
+          <div v-for="g in companyGroups" :key="g.id" class="repo-group" style="margin-bottom:6px;">
+            <label class="repo-group-header" style="display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;">
               <input
                 type="checkbox"
-                :checked="chatStore.selectedRepos.includes(r)"
-                @change="toggleRepo(r)"
+                :checked="isGroupSelected(g.repos)"
+                @change="toggleCompanyGroup(g)"
+                style="width:14px; height:14px; cursor:pointer;"
               />
-              <span class="repo-name">{{ r }}</span>
+              <span style="font-size:12.5px; font-weight:600; color:var(--text);">{{ g.name }}</span>
+              <span style="font-size:11px; color:var(--text3);">({{ g.repos.length }}개 모듈)</span>
             </label>
           </div>
         </div>
       </div>
 
-      <!-- 5. 대화 기록 -->
+      <!-- 대화 기록 -->
       <div class="history-section">
-        <span class="section-title">대화 기록</span>
+        <div class="section-label" style="margin-bottom:8px;">대화 기록</div>
         <div class="history-list">
           <div
             v-for="s in chatStore.chatHistory"
             :key="s.id"
-            class="history-item"
-            :class="{ active: chatStore.currentChatId === s.id }"
-            @click="chatStore.loadChat(s.id)"
+            class="history-item-wrap"
           >
-            <span class="chat-title">{{ s.title || '새 대화' }}</span>
-            <button class="btn-del-history" @click.stop="chatStore.deleteChat(s.id)">✕</button>
+            <div
+              class="history-item"
+              :class="{ active: chatStore.currentChatId === s.id }"
+              @click="chatStore.loadChat(s.id); closeMobileMenu();"
+            >
+              <span class="chat-title">{{ s.title || '새 대화' }}</span>
+              <span class="desktop-del-btn" @click.stop="chatStore.deleteChat(s.id)">✕</span>
+            </div>
+          </div>
+          <div v-if="chatStore.chatHistory.length === 0" style="font-size:12px;color:var(--text3);text-align:center;padding:16px 0;">
+            대화 기록이 없습니다
           </div>
         </div>
       </div>
 
-      <!-- 6. 사이드바 하단 (사용자 프로필) -->
-      <div class="sidebar-footer">
-        <div class="user-profile">
-          <strong>👤 {{ authStore.user?.name || authStore.user?.id || '사용자' }}</strong>
-          <span v-if="authStore.isAdmin" class="admin-badge">Admin</span>
-        </div>
+      <!-- 사이드바 푸터: 테마 및 알림 -->
+      <div class="sidebar-footer" style="padding:10px 12px; border-top:1px solid var(--border); margin-top:auto; display:flex; gap:8px;">
+        <button
+          type="button"
+          style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:12px; cursor:pointer; text-align:left; display:flex; align-items:center; gap:6px;"
+        >
+          <SvgIcon name="bell" size="14" /> 알림 켜기
+        </button>
+        <button
+          type="button"
+          title="라이트/다크 전환"
+          style="width:38px; flex-shrink:0; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center;"
+          @click="toggleTheme"
+        >
+          <SvgIcon :name="currentTheme === 'dark' ? 'sun' : 'moon'" size="15" />
+        </button>
       </div>
     </aside>
 
-    <!-- 우측 메인 대화 영역 -->
-    <main class="chat-main">
-      <!-- 상단 헤더 -->
-      <header class="main-header">
-        <div class="header-left">
-          <span class="company-chip">
-            🏢 {{ chatStore.companies.find(c => c.id === chatStore.selectedCompany)?.name || '고객사' }}
-          </span>
-          <span class="repo-count">{{ chatStore.selectedRepos.length }}개 저장소 선택됨</span>
-        </div>
-
-        <div class="header-right">
-          <label class="toggle-opt"><input v-model="isFastMode" type="checkbox" /> ⚡ 빠른모드</label>
-          <label class="toggle-opt"><input v-model="isConciseMode" type="checkbox" /> 📝 간결</label>
-          <select v-model="chatStore.selectedModel" class="model-select">
+    <!-- 우측 메인 영역 -->
+    <main class="main">
+      <div class="main-header">
+        <button class="mobile-menu-btn" @click="toggleMobileMenu">☰</button>
+        <span class="header-title">
+          {{ chatStore.chatHistory.find(c => c.id === chatStore.currentChatId)?.title || '새 대화' }}
+        </span>
+        <div class="header-badges" style="display:flex; align-items:center; gap:10px;">
+          <span v-if="currentCompanyName" class="badge">🏢 {{ currentCompanyName }}</span>
+          <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer; color:var(--text2);">
+            <input v-model="isFastMode" type="checkbox" /> ⚡ 빠른모드
+          </label>
+          <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer; color:var(--text2);">
+            <input v-model="isConciseMode" type="checkbox" /> 📝 간결
+          </label>
+          <select v-model="chatStore.selectedModel" style="padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface); font-size:12px; color:var(--text);">
             <option value="agy">🌌 Antigravity flash 3.7</option>
             <option value="sonnet">⚡ Claude Sonnet</option>
           </select>
         </div>
-      </header>
+      </div>
 
-      <!-- 메시지 목록 스크롤 -->
-      <div ref="messageContainer" class="messages-container">
-        <div v-if="chatStore.currentMessages.length === 0" class="welcome-card">
-          <div class="welcome-icon">💡</div>
-          <h2>eCAMS 코드 분석 AI</h2>
-          <p>코드 흐름, DB 조회, 화면 분석 등 무엇이든 한국어로 질문해보세요.</p>
+      <!-- 채팅 대화 영역 -->
+      <div ref="messageContainer" class="chat-area">
+        <div v-if="chatStore.currentMessages.length === 0" class="empty-state">
+          <div class="empty-icon"><SvgIcon name="lightbulb" size="26" /></div>
+          <div class="empty-title">eCAMS 코드 분석 AI</div>
+          <div class="empty-desc">
+            코드 흐름, DB 조회, 화면 분석 등<br>무엇이든 한국어로 질문해보세요
+          </div>
         </div>
 
         <ChatMessage
@@ -386,40 +429,60 @@ function handleKeyDown(e: KeyboardEvent) {
         />
       </div>
 
-      <!-- 하단 입력 영역 -->
-      <div class="input-container">
-        <!-- 이미지 첨부 미리보기 -->
-        <div v-if="attachedImages.length > 0" class="preview-bar">
-          <div v-for="(img, idx) in attachedImages" :key="idx" class="preview-chip">
-            <span>📷 {{ img.name }}</span>
-            <button @click="removeImage(idx)">✕</button>
-          </div>
-        </div>
+      <!-- 입력창 -->
+      <div class="input-area">
+        <div class="input-box">
+          <div class="input-top">
+            <!-- 이미지 미리보기 -->
+            <div v-if="attachedImages.length > 0" class="image-preview" style="display:flex;">
+              <div v-for="(img, idx) in attachedImages" :key="idx" class="preview-thumb">
+                <img :src="img.url" alt="미리보기" />
+                <button class="remove-img" @click="removeImage(idx)">×</button>
+              </div>
+            </div>
 
-        <div class="input-card">
-          <textarea
-            v-model="inputText"
-            rows="2"
-            placeholder="코드나 화면에 대해 질문해보세요... (사진 첨부 가능, Enter 전송, Shift+Enter 줄바꿈)"
-            :disabled="chatStore.isStreaming"
-            @keydown="handleKeyDown"
-          />
-          <div class="input-footer">
-            <input ref="imgUploadInput" type="file" accept="image/*" multiple style="display:none;" @change="handleImageAttach" />
-            <button class="btn-attach" title="사진 첨부" @click="triggerImageUpload">📎</button>
+            <textarea
+              v-model="inputText"
+              id="msgInput"
+              placeholder="코드나 화면에 대해 질문해보세요... (사진 첨부 가능)"
+              rows="1"
+              :disabled="chatStore.isStreaming"
+              @keydown="handleKeyDown"
+            ></textarea>
+          </div>
+
+          <div class="input-bottom">
+            <input
+              ref="fileInputRef"
+              type="file"
+              id="fileInput"
+              accept="image/*"
+              multiple
+              style="display:none;"
+              @change="handleFileChange"
+            />
+            <button class="icon-btn" :class="{ 'has-image': attachedImages.length > 0 }" title="사진 첨부" @click="triggerFileInput">
+              <SvgIcon name="paperclip" size="18" />
+            </button>
+
             <button
-              class="btn-send"
+              class="send-btn"
               :disabled="(!inputText.trim() && attachedImages.length === 0) || chatStore.isStreaming"
+              title="전송"
               @click="handleSendMessage()"
             >
-              {{ chatStore.isStreaming ? '분석 중...' : '전송 ➔' }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
             </button>
           </div>
         </div>
+        <div class="input-hint">Enter로 전송 · Shift+Enter 줄바꿈 · 사진 첨부 가능</div>
       </div>
     </main>
 
-    <!-- 모든 모달 컴포넌트 마운트 -->
+    <!-- 모든 모달들 -->
     <SourceViewerModal
       :is-open="showSourceModal"
       :file-path="sourceModalPath"
@@ -439,74 +502,13 @@ function handleKeyDown(e: KeyboardEvent) {
 </template>
 
 <style scoped>
-.workspace-layout { display: flex; height: 100vh; width: 100vw; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; overflow: hidden; }
-
-/* 사이드바 */
-.sidebar { width: 280px; background: #ffffff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100vh; }
-.sidebar-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
-.brand { display: flex; align-items: center; gap: 8px; font-size: 16px; color: #0f172a; }
-.logout-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.action-btn-group { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #f1f5f9; }
-.btn-switch-classic { text-align: center; text-decoration: none; padding: 6px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 700; color: #334155; }
-.btn-new-chat { background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; padding: 7px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
-.admin-menu-group { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-top: 1px dashed #e2e8f0; border-bottom: 1px dashed #e2e8f0; }
-.btn-menu { background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; text-align: left; cursor: pointer; color: #334155; }
-.btn-menu:hover { background: #f8fafc; }
-.btn-menu.admin { color: #dc2626; font-weight: 600; }
-.btn-menu.wiki { color: #16a34a; font-weight: 600; }
-
-.company-section { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
-.company-section label { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
-.company-section select { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12.5px; }
-
-.repo-section { padding: 10px 14px; flex: 1; min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid #f1f5f9; }
-.section-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; }
-.select-all-label { font-size: 11px; font-weight: 500; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.repo-search-input { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; margin-bottom: 6px; }
-.repo-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.repo-check-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #334155; cursor: pointer; padding: 2px 0; }
-.repo-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.db-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
-.db-title { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; display: block; }
-
-.history-section { height: 160px; padding: 10px 14px; display: flex; flex-direction: column; border-bottom: 1px solid #f1f5f9; }
-.section-title { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; }
-.history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
-.history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-.history-item:hover { background: #f1f5f9; }
-.history-item.active { background: #e0f2fe; color: #0284c7; font-weight: 600; }
-.chat-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.btn-del-history { background: none; border: none; color: #94a3b8; font-size: 11px; cursor: pointer; padding: 2px; }
-.btn-del-history:hover { color: #ef4444; }
-
-.sidebar-footer { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
-.user-profile { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #1e293b; }
-.admin-badge { background: #dbeafe; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
-
-/* 메인 채팅 */
-.chat-main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.main-header { height: 52px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
-.header-left { display: flex; align-items: center; gap: 10px; }
-.company-chip { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: 700; }
-.repo-count { font-size: 12px; color: #64748b; }
-.header-right { display: flex; align-items: center; gap: 14px; }
-.toggle-opt { font-size: 12px; color: #475569; display: flex; align-items: center; gap: 4px; cursor: pointer; }
-.model-select { padding: 5px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; }
-
-.messages-container { flex: 1; overflow-y: auto; padding: 24px; max-width: 960px; width: 100%; margin: 0 auto; box-sizing: border-box; }
-.welcome-card { text-align: center; padding: 80px 20px; }
-.welcome-icon { font-size: 40px; margin-bottom: 10px; }
-.welcome-card h2 { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0; }
-.welcome-card p { font-size: 14px; color: #64748b; margin: 0; }
-
-.input-container { padding: 14px 20px 20px 20px; max-width: 960px; width: 100%; margin: 0 auto; box-sizing: border-box; }
-.preview-bar { display: flex; gap: 6px; margin-bottom: 6px; }
-.preview-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
-.preview-chip button { background: none; border: none; color: #94a3b8; cursor: pointer; }
-.input-card { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
-.input-card textarea { width: 100%; border: none; outline: none; resize: none; font-family: inherit; font-size: 14px; color: #1e293b; box-sizing: border-box; }
-.input-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-.btn-attach { background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b; padding: 4px; }
-.btn-send { background: #3b82f6; color: #ffffff; border: none; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
-.btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.app-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
 </style>

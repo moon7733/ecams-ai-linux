@@ -23,15 +23,17 @@ export async function fetchUsers() {
   return res.data;
 }
 
-export async function grantUserCompany(targetUserId: string, companyId: string, level: string) {
+export async function grantCompanyAuth(targetUserId: string, companyId: string, level: string) {
   const res = await client.post('/users/grant-company', { targetUserId, companyId, level });
   return res.data;
 }
+export const grantUserCompany = grantCompanyAuth;
 
-export async function revokeUserCompany(targetUserId: string, companyId: string) {
+export async function revokeCompanyAuth(targetUserId: string, companyId: string) {
   const res = await client.post('/users/revoke-company', { targetUserId, companyId });
   return res.data;
 }
+export const revokeUserCompany = revokeCompanyAuth;
 
 export async function deleteUser(targetUserId: string) {
   const res = await client.post('/users/delete', { targetUserId });
@@ -39,10 +41,11 @@ export async function deleteUser(targetUserId: string) {
 }
 
 // 3. 고객사 관리 (Admin)
-export async function addCompany(company: { name: string; address?: string; manager?: string }) {
+export async function createCompany(company: { id?: string; name: string; address?: string; manager?: string }) {
   const res = await client.post('/companies', company);
   return res.data;
 }
+export const addCompany = createCompany;
 
 export async function updateCompany(id: string, updates: any) {
   const res = await client.put(`/companies/${id}`, updates);
@@ -60,10 +63,11 @@ export async function fetchIndexStatus() {
   return res.data;
 }
 
-export async function triggerReindex(repoId: string) {
+export async function rebuildIndex(repoId: string) {
   const res = await client.post(`/indexes/rebuild/${repoId}`);
   return res.data;
 }
+export const triggerReindex = rebuildIndex;
 
 // 5. 가이드 문서 업로드 (Admin)
 export async function uploadGuideDoc(formData: FormData) {

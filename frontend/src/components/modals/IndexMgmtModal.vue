@@ -1,7 +1,8 @@
-<!-- 코드 인덱스 관리 (Admin) 모달 컴포넌트 -->
+<!-- 인덱스 관리 (Admin) 모달 컴포넌트 -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { fetchIndexStatus, triggerReindex } from '@/api/admin';
+import SvgIcon from '@/components/SvgIcon.vue';
+import { fetchIndexStatus, rebuildIndex } from '@/api/admin';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -13,104 +14,72 @@ const emit = defineEmits<{
 
 const indexes = ref<any[]>([]);
 const loading = ref(false);
-const reindexingRepo = ref<string | null>(null);
+const rebuilding = ref<Record<string, boolean>>({});
 
 watch(() => props.isOpen, (open) => {
-  if (open) loadStatus();
+  if (open) loadIndexes();
 });
 
-async function loadStatus() {
+async function loadIndexes() {
   loading.value = true;
   try {
     const data = await fetchIndexStatus();
     indexes.value = data.indexes || [];
-  } catch (err: any) {
-    alert('인덱스 현황을 불러오지 못했습니다.');
   } finally {
     loading.value = false;
   }
 }
 
-async function handleReindex(repoId: string) {
-  reindexingRepo.value = repoId;
+async function handleRebuild(repoId: string) {
+  rebuilding.value[repoId] = true;
   try {
-    await triggerReindex(repoId);
-    alert(`'${repoId}' 인덱스 생성을 백그라운드에서 시작했습니다.`);
-    await loadStatus();
+    await rebuildIndex(repoId);
+    alert(`'${repoId}' 인덱스 재생성이 백그라운드에서 시작되었습니다.`);
+    await loadIndexes();
   } catch (err: any) {
-    alert(err.response?.data?.error || '인덱스 재생성에 실패했습니다.');
+    alert(err.response?.data?.error || '인덱스 재생성 요청 실패');
   } finally {
-    reindexingRepo.value = null;
+    rebuilding.value[repoId] = false;
   }
 }
 </script>
 
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click="emit('close')">
-    <div class="modal-card" @click.stop>
-      <div class="modal-head">
-        <h3>🗄️ 코드 인덱스 관리</h3>
-        <button class="close-btn" @click="emit('close')">✕</button>
+  <div v-if="isOpen" class="modal-overlay" @click="emit('close')">
+    <div class="modal-card" style="max-width: 580px;" @click.stop>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2><SvgIcon name="database" size="20" /> 인덱스 관리 (관리자)</h2>
+        <button class="logout-btn" style="font-size:18px;" @click="emit('close')">✕</button>
       </div>
 
-      <div class="modal-body">
-        <p class="desc">인덱스를 생성하면 AI가 파일을 탐색하지 않고 즉시 관련 파일로 이동하여 응답 속도가 향상됩니다.</p>
+      <p style="font-size:12.5px; color:var(--text2); margin-bottom:12px;">
+        레포지토리별 인덱스 준비 상태를 확인하고 RAG 검색 인덱스를 수동으로 재생성할 수 있습니다.
+      </p>
 
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>레포지토리</th>
-                <th style="text-align:center;">상태</th>
-                <th style="text-align:center; width: 100px;">작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in indexes" :key="item.repoId">
-                <td><strong>{{ item.repoId }}</strong></td>
-                <td style="text-align:center;">
-                  <span class="status-pill" :class="{ ready: item.status === 'ready' }">
-                    {{ item.status === 'ready' ? '✅ 준비완료' : '⏳ 미생성' }}
-                  </span>
-                </td>
-                <td style="text-align:center;">
-                  <button
-                    class="btn-action"
-                    :disabled="reindexingRepo === item.repoId"
-                    @click="handleReindex(item.repoId)"
-                  >
-                    {{ reindexingRepo === item.repoId ? '생성 중...' : '재생성' }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div v-if="loading" style="text-align:center; padding:20px; color:var(--text3); font-size:13px;">
+        불러오는 중...
+      </div>
+
+      <div v-else style="display:flex; flex-direction:column; gap:6px; max-height:360px; overflow-y:auto;">
+        <div v-for="idx in indexes" :key="idx.repoId" class="list-item" style="padding:10px 12px;">
+          <div>
+            <div style="font-weight:700; color:var(--text); font-size:13px;">{{ idx.repoId }}</div>
+            <div style="font-size:11px; color:var(--text3); margin-top:2px;">
+              상태: <span :style="{ color: idx.ready ? 'var(--green)' : 'var(--danger)' }">{{ idx.ready ? '준비 완료' : '미생성 / 진행 중' }}</span>
+              <span v-if="idx.docCount"> | 문서 수: {{ idx.docCount }}</span>
+            </div>
+          </div>
+          <button
+            style="width:auto; padding:4px 10px; font-size:11.5px; background:var(--accent); margin:0;"
+            :disabled="rebuilding[idx.repoId]"
+            @click="handleRebuild(idx.repoId)"
+          >
+            {{ rebuilding[idx.repoId] ? '재생성 중...' : '재생성' }}
+          </button>
         </div>
       </div>
 
-      <div class="modal-foot">
-        <button class="btn-close" @click="emit('close')">닫기</button>
-      </div>
+      <button class="outline" style="margin-top:16px;" @click="emit('close')">닫기</button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-card { width: 90%; max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh; }
-.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
-.modal-head h3 { margin: 0; font-size: 16px; color: #1e293b; }
-.close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b; }
-.modal-body { padding: 20px; overflow-y: auto; }
-.desc { font-size: 12.5px; color: #64748b; margin: 0 0 14px 0; }
-.table-wrap { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th, .table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; }
-.table th { background: #f8fafc; color: #475569; font-weight: 600; }
-.status-pill { font-size: 12px; font-weight: 600; color: #64748b; }
-.status-pill.ready { color: #16a34a; }
-.btn-action { background: #3b82f6; color: #fff; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; }
-.btn-action:disabled { opacity: 0.6; cursor: not-allowed; }
-.modal-foot { padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
-.btn-close { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
-</style>
