@@ -206,6 +206,7 @@ function handleKeyDown(e: KeyboardEvent) {
           <span class="repo-count-badge">{{ chatStore.selectedRepos.length }}개 저장소 분석</span>
         </div>
         <div class="header-right">
+          <a href="/" class="switch-page-btn" style="text-decoration:none; padding:5px 10px; border-radius:6px; background:#f1f5f9; color:#334155; font-size:12px; font-weight:700; border:1px solid #cbd5e1; margin-right:8px;">🔙 클래식 화면</a>
           <select v-model="chatStore.selectedModel" class="model-select">
             <option value="agy">🌌 Antigravity flash 3.7</option>
             <option value="sonnet">⚡ Sonnet</option>

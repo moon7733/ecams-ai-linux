@@ -191,10 +191,10 @@ app.use(express.json({ limit: '200mb' }));
 
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendDist)) {
-  console.log('[Frontend] Serving Vue 3 frontend from:', frontendDist);
-  app.use(express.static(frontendDist));
+  console.log('[Frontend] Vue 3 available at /v2 from:', frontendDist);
+  app.use('/v2', express.static(frontendDist));
 }
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ===== 데이터 로드 및 저장 =====
 let USERS = {};
@@ -3168,14 +3168,9 @@ app.post('/api/admin/guides/upload', authMiddleware, upload.single('docfile'), a
 });
 
 if (fs.existsSync(frontendDist)) {
-  app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/internal')) return next();
-    res.sendFile(path.join(frontendDist, 'index.html'));
-  });
-} else {
-  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+  app.get('/v2*', (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
 }
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => console.log('Server running: http://0.0.0.0:' + PORT));

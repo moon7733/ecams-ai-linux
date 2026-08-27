@@ -1912,6 +1912,7 @@
         eCAMS AI
         <button class="logout-btn" onclick="logout()" title="로그아웃"><span class="ico" data-ico="logout"></span></button>
       </div>
+      <button class="action-btn" onclick="window.location.href='/v2/'" style="color:var(--primary); font-weight:700;">✨ 새 UI (Vue 3)</button>
       <button class="new-chat-btn" onclick="newChat()"><span class="ico" data-ico="edit"></span> 새 대화</button>
       <div id="adminMenu" style="display:none;">
         <button class="action-btn admin" onclick="openApprovalModal()"><span class="ico" data-ico="shield"></span> 결재함 (Admin)</button>
@@ -1964,8 +1965,11 @@
     <div class="main-header">
       <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
       <span class="header-title" id="headerTitle">새 대화</span>
-      <div class="header-badges">
+      <div class="header-badges" style="display:flex; align-items:center; gap:8px; margin-left:auto;">
         <span class="badge" id="companyChip" style="display:none;"></span>
+        <a href="/v2/" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:6px; background:#3b82f6; color:#ffffff; font-size:12px; font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+          ✨ Vue 3 화면 전환
+        </a>
       </div>
     </div>
 
