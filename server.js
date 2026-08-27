@@ -837,9 +837,8 @@ app.post('/api/fs/analyze', authMiddleware, (req, res) => {
 
   const prompt = `${instruction}\n\n파일명: ${filename || '(미상)'}\n\n\`\`\`\n${text}\n\`\`\``;
 
-  const args = ['-p', '--model', MODEL_IDS.sonnet, '--max-turns', '1',
-    '--dangerously-skip-permissions',
-    '--disallowedTools', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Read', 'Grep', 'Glob'];
+  const args = ['-p', '--model', MODEL_IDS.sonnet,
+    '--dangerously-skip-permissions'];
   const proc = spawn('agy', args, { shell: true, windowsHide: true, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
 
   let out = '', err = '';
