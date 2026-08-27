@@ -3163,11 +3163,13 @@ app.post('/api/admin/guides/upload', authMiddleware, upload.single('docfile'), a
 
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendDist)) {
+  console.log('[Frontend] Serving Vue 3 frontend from:', frontendDist);
   app.use(express.static(frontendDist));
-  app.use(express.static(path.join(__dirname, 'public')));
   app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+  app.use(express.static(path.join(__dirname, 'public')));
   app.get('/', (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
 } else {
+  console.log('[Frontend] Serving legacy vanilla frontend from public/');
   app.use(express.static(path.join(__dirname, 'public')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 }
