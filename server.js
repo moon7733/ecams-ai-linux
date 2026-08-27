@@ -2116,7 +2116,8 @@ function runAgyOnce(fullPrompt, res, cwd, includeDirs, req = null) {
     args.push(
       '--dangerously-skip-permissions',
       '--print-timeout', '5m',
-      '-p', `${promptFile.replace(/\\/g, '/')} 파일을 읽고 그대로 지시에 따라 답해줘.`
+      '-m', 'gemini-3.7-flash',
+      '-p', `${promptFile.replace(/\\/g, '/')} 파일만 읽고 그외 지시에 따라 답해줘`
     );
 
     logAgy(`START promptLen=${fullPrompt.length} cwd=${cwd} dirs=${includeDirs.length}`);
@@ -2584,7 +2585,7 @@ async function runChatJob(jobId, { message, allowedRepos, userRepos, history, im
       if (model === 'haiku') modelLabel = (modelInput === 'haiku') ? '🚀 Haiku 단독 분석 중 (Repo-map 모드)...' : '🚀 Haiku 빠른 분석 중...';
       else if (model === 'sonnet' && modelInput === 'sonnet') modelLabel = '⚡ Sonnet 단독 정밀 분석 중...';
       else if (model === 'sonnet+haiku') modelLabel = '🎯 Sonnet planner + Haiku executor 라우팅 중 (2-Stage)...';
-      else if (model === 'agy') modelLabel = '🌌 Antigravity flash 3.5 분석 중...';
+      else if (model === 'agy') modelLabel = '🌌 Antigravity flash 3.7 분석 중...';
 
       if (model === 'codex') modelLabel = 'Codex GPT exec read-only 분석 중...';
       appendChunk(jobId, 'data: ' + JSON.stringify({ type: 'status', text: modelLabel }) + '\n\n');
