@@ -44,6 +44,30 @@ console.error = function(...args) {
   originalError.apply(console, [getKoreanTime(), ...args]);
 };
 
+// .env 파일 로드
+function loadEnvFile() {
+  const p = path.join(__dirname, '.env');
+  if (!fs.existsSync(p)) return;
+  try {
+    const lines = fs.readFileSync(p, 'utf8').split('\n');
+    for (const l of lines) {
+      const trimmed = l.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const k = trimmed.slice(0, idx).trim();
+        const v = trimmed.slice(idx + 1).trim();
+        if (!process.env[k]) process.env[k] = v;
+      }
+    }
+  } catch (e) {}
+}
+loadEnvFile();
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'https://ecams.tail4f6f17.ts.net:10000/api/auth/google/callback';
+
 // agy CLI 실행 정의
 const AGY_EXE = process.env.AGY_EXE_PATH || (process.platform === 'win32'
   ? path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
@@ -365,6 +389,99 @@ app.post('/api/logout', (req, res) => {
   const token = req.headers['authorization']?.split(' ')[1] || req.headers['authorization'];
   if (token && sessions[token]) delete sessions[token];
   res.json({ success: true });
+});
+
+// ===== Google OAuth 2.0 API =====
+
+app.get('/api/auth/google/url', (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(500).json({ error: '서버에 Google OAuth 설정(GOOGLE_CLIENT_ID/SECRET)이 구성되지 않았습니다.' });
+  }
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: GOOGLE_CALLBACK_URL,
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    prompt: 'select_account'
+  });
+  res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` });
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect(`/#/login?error=${encodeURIComponent(error || 'Google login was cancelled.')}`);
+  }
+  try {
+    const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: GOOGLE_CALLBACK_URL
+    });
+    const { access_token } = tokenRes.data;
+    const userRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
+    const { email, name, picture } = userRes.data;
+
+    let matchedUserId = null;
+    let matchedUser = null;
+    for (const [uid, u] of Object.entries(USERS)) {
+      if (u.email && u.email.toLowerCase() === email.toLowerCase()) {
+        matchedUserId = uid;
+        matchedUser = u;
+        break;
+      }
+    }
+    if (!matchedUserId) {
+      const prefix = email.split('@')[0].toLowerCase();
+      if (USERS[prefix]) {
+        matchedUserId = prefix;
+        matchedUser = USERS[prefix];
+      }
+    }
+
+    if (!matchedUserId || !matchedUser) {
+      console.warn(`[Google Auth] Unauthorized email: ${email}`);
+      return res.redirect(`/#/login?error=${encodeURIComponent(`승인되지 않은 구글 계정(${email})입니다. 관리자에게 계정 등록을 요청하세요.`)}`);
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions[token] = {
+      id: matchedUserId,
+      email,
+      name: matchedUser.name || name || matchedUserId,
+      picture: picture || '',
+      isAdmin: matchedUserId === 'admin',
+      repos: matchedUser.repos || {},
+      companies: matchedUser.companies || {},
+      userType: matchedUser.userType,
+      createdAt: Date.now()
+    };
+    console.log(`[Google Auth] User logged in: ${matchedUserId} (${email})`);
+    res.redirect(`/#/auth/callback?token=${token}&id=${matchedUserId}&name=${encodeURIComponent(sessions[token].name)}&isAdmin=${matchedUserId === 'admin'}`);
+  } catch (err) {
+    console.error('[Google Auth Callback Error]:', err.response?.data || err.message);
+    res.redirect(`/#/login?error=${encodeURIComponent('구글 인증 처리 중 오류가 발생했습니다.')}`);
+  }
+});
+
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      name: req.user.name || USERS[req.user.id]?.name || req.user.id,
+      email: req.user.email || USERS[req.user.id]?.email,
+      picture: req.user.picture || '',
+      isAdmin: req.user.isAdmin,
+      repos: req.user.repos,
+      companies: req.user.companies,
+      userType: req.user.userType
+    }
+  });
 });
 
 // 로그인 아이디 기준 대화기록 저장소. localStorage 는 캐시로만 사용한다.

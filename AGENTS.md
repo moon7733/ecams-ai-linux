@@ -14,6 +14,21 @@
 
 작업 시작 전에 아래를 먼저 읽는다.
 
+### 실행 환경 정본 (2026-08-12 오너 확인)
+
+- 에이전트는 로컬 Windows PC의 `C:\ecams-ai-linux`에서 소스를 수정한다.
+- 원격 저장소는 `https://github.com/moon7733/ecams-ai-linux`, 기본 브랜치는 `main`, 배포 트리거는 webhook이다.
+- GitLab만 `192.168.0.11`에 있다. Jenkins·AzBrain·PMS·PostgreSQL은 `192.168.0.21`에 있다.
+- Jenkins는 `http://192.168.0.21:18081`, AzBrain job은 `ecams-ai-linux`다.
+- 실제 AzBrain은 `azbrain@192.168.0.21:/home/azbrain/azbrain`, 게시 포트 `13000`에서 실행된다.
+- 외부 URL은 `https://ecams.tail4f6f17.ts.net:10000/`, ID/비밀번호 로그인 방식이다.
+- PostgreSQL은 `192.168.0.21:5432` 호스트 직접 설치이며 운영·개발 공용 한 벌이다. 명시 요청 없는 쓰기·정리 금지.
+- PMS bridge는 `8790`, 헬스체크는 `/pms/health`다.
+- SSH는 `azbrain:/home/azbrain/azbrain`과 `pms:/home/pms/pms` 범위만 허용한다.
+- 비밀번호·토큰·키를 문서, 명령행, 로그, 커밋에 기록하지 않는다.
+- main push에 따른 자동 배포는 보통 1~2분이다. 수동 재시작은 사용자 명시 요청이 있을 때만 한다.
+- 과거 문서의 `192.168.0.11` 배포 서버 또는 `/SW2/...` 경로는 역사 기록이며 현재 운영 정본이 아니다.
+
 1. **`MEMO.md`** — `gen_memo.js` 가 자동 생성한 현재 프로젝트 상태 (최근 변경 파일, 현재 골). 휘발성.
 2. **`docs/` 하위 진행 중 feature 문서** — 특히 `docs/<feature>/checklist.md` 가 있으면 어디까지 진행됐는지 확인.
 3. **누적 결정 기록 (결정 1~68, 2026-05-19 ~ 2026-05-21)** — 이전 PoC 두 개의 plan/checklist/context-notes 에 모든 결정 본문 보존.

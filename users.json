@@ -1,5 +1,6 @@
 {
   "admin": {
+    "email": "lym7733@gmail.com",
     "password": "$2b$10$5TY6p0LGMpqXBIkD4uixqecZpdRJC3Cu8upKjHnYAjVr1QyXTj7jy",
     "repos": {
       "kjbank_html5": "edit",
